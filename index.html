@@ -165,6 +165,7 @@ table.lg td.act button:hover{color:var(--err)}
 .mbox.wide{max-width:980px}
 .chip .gcx{border:0;background:none;color:inherit;opacity:.55;cursor:pointer;padding:0 0 0 4px;font-size:12px}
 .chip .gcx:hover{opacity:1}
+.pmchips .chip{padding:5px 10px;font-size:13px}@media(max-width:700px){.pmchips .chip{padding:4px 8px;font-size:12.5px}.pmchips .chip input{width:13px!important;height:13px!important}}
 @media(max-width:899px){.bottom button{font-size:10.5px}}
 /* ana ekran */
 body.homemode .side, body.homemode .bottom{display:none}
@@ -409,7 +410,7 @@ function normalize(d){
   d.settings = Object.assign(def.settings, d.settings||{});
   d.settings.codes = Object.assign(defaults().settings.codes, d.settings.codes||{});
   d.settings.counters = Object.assign(defaults().settings.counters, d.settings.counters||{});
-  d.samples = d.samples||[]; d.meas = d.meas||[]; d.holes = d.holes||[]; d.obs = d.obs||[]; d.geochem = d.geochem||[];
+  d.samples = d.samples||[]; d.meas = d.meas||[]; d.holes = d.holes||[]; d.obs = d.obs||[]; d.geochem = d.geochem||[]; d.layers = d.layers||[];
   d.samples.forEach(r=>{ r._u=r._u||uid(); });
   d.holes.forEach(h=>{h.survey=h.survey||[];h.lith=h.lith||[];h.samp=h.samp||[];h.qc=h.qc||[];
     h.samp=h.samp.filter(r=>{ if(/duplikat|Standart|Blank/i.test(r.tip||'')){ h.qc.push({_u:r._u||uid(), id:r.id, tip:/Standart/i.test(r.tip)?'Standart (CRM)':/Blank/i.test(r.tip)?'Blank':'Saha duplikatı', ref:'', from:r.from, to:r.to, not:r.not||''}); return false; } return true; });
@@ -434,7 +435,7 @@ function openProject(id, view){
   const m=APP.projects.find(p=>p.id===id); if(!m) return;
   try{ DB=normalize(JSON.parse(sget(PKEY(id))||'null')||defaults()); }catch(e){ DB=defaults(); }
   APP.current=id; saveApp();
-  edit=null; obsEdit=null; holeEdit=null; ui.hole=null; ui.dbSel=new Set(); ui.gx=null; ui.gcImp=null; ui.gcView='main'; gcMap.fit=false;
+  edit=null; obsEdit=null; holeEdit=null; ui.hole=null; ui.dbSel=new Set(); ui.gx=null; ui.gcImp=null; ui.gcView='main'; gcMap.fit=false; ui.pm=null; IMGS.clear(); assayIdx.key=null;
   go(view||'ornekler');
 }
 function exitProject(){
@@ -669,7 +670,8 @@ const NAV = [
   ['olcum','Ölçüm','<circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 12l4-6"/><path d="M5 17h14"/>','Ölçüm'],
   ['sondaj','Sondaj','<path d="M12 2v14"/><path d="M8 6h8"/><path d="M9 16h6l-3 6z"/>','Sondaj'],
   ['veritabani','Veritabanı','<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/>','Veri'],
-  ['jeokimya','Jeokimya','<path d="M9 3h6"/><path d="M10 3v6.5L4.6 18.2A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.7-2.8L14 9.5V3"/><path d="M7.5 15h9"/>','Jeokimya'],
+  ['harita','Proje haritası','<path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>','Harita'],
+  ['jeokimya','Jeokimya','<path d="M9 3h6"/><path d="M10 3v6.5L4.6 18.2A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.7-2.8L14 9.5V3"/><path d="M7.5 15h9"/>','Jeokim.'],
   ['aktar','Aktar / Ayar','<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>','Aktar']
 ];
 let _lgN=0;
@@ -690,7 +692,7 @@ function renderNav(){
     <div class="proj"><b>${esc(m.name||'')}</b>${esc([m.code, m.region, m.country].filter(Boolean).join(' · '))}
     <button class="btn exit" data-act="exitProj">⟵ Projeden çık</button></div>
     <div class="small" style="color:#9aa397;padding:0 12px 6px;text-transform:uppercase;letter-spacing:.8px;font-size:11px">Saha defteri</div>
-    ${NAV.map(([k,l,i])=>btn(k,l,i)).join('')}<div class="foot">GEOLOOT · v0.12</div>`;
+    ${NAV.map(([k,l,i])=>btn(k,l,i)).join('')}<div class="foot">GEOLOOT · v0.13</div>`;
 }
 function projTop(){ const m=curMeta()||{}; return `<div class="ptop">${LOGO_SVG(26)}<b>${esc(m.name||'')}</b><button data-act="exitProj">⟵ Projeden çık</button></div>`; }
 function go(v){ ui.view=v; if(location.hash.slice(1)!==v){ try{history.replaceState(null,'','#'+v);}catch(e){} } render(); window.scrollTo(0,0); }
@@ -705,7 +707,7 @@ function render(){
     afterRender(); return;
   }
   renderNav();
-  const V = {gozlem:viewObs, ornekler:viewSamples, yeni:viewSampleForm, olcum:viewClino, sondaj:viewDrill, veritabani:viewDB, jeokimya:viewGeochem, aktar:viewExport, 'proje-bilgi':viewProjInfo}[ui.view] || viewSamples;
+  const V = {gozlem:viewObs, ornekler:viewSamples, yeni:viewSampleForm, olcum:viewClino, sondaj:viewDrill, veritabani:viewDB, jeokimya:viewGeochem, harita:viewMap, aktar:viewExport, 'proje-bilgi':viewProjInfo}[ui.view] || viewSamples;
   $('#main').innerHTML = projTop() + V();
   afterRender();
 }
@@ -986,13 +988,13 @@ async function deleteProject(id){
 async function importProjectFile(file){
   try{
     const d=JSON.parse(await file.text()); if(!Array.isArray(d.samples)) throw 0;
-    const meta=d.project||{}; delete d.project; const pd=d.photoData; delete d.photoData; const gd=d.gcData; delete d.gcData;
+    const meta=d.project||{}; delete d.project; const pd=d.photoData; delete d.photoData; const gd=d.gcData; delete d.gcData; const imd=d.imgData; delete d.imgData;
     const data=normalize(d), id=uid();
     let name=meta.name||('İçe aktarılan proje ('+data.settings.prj+')');
     if(APP.projects.some(p=>p.name===name)) name+=' – kopya';
     APP.projects.push({...meta, id, name, code:data.settings.prj, created:meta.created||today(), updated:today(), stats:projStats(data)});
     sset(PKEY(id), JSON.stringify(data)); saveApp();
-    if(gd){ for(const [k,r] of Object.entries(gd)) await gcPut(k,r); }
+    if(gd){ for(const [k,r] of Object.entries(gd)) await gcPut(k,r); } if(imd){ for(const [k,u] of Object.entries(imd)){ try{ await imgPut(k, dataURLToBlob(u)); }catch(_){} } } IMGS.clear();
     if(pd){ for(const [pid,u] of Object.entries(pd)){ try{ const full=dataURLToBlob(u); const {thumb}=await makePhotoBlobs(full); await phPut({id:pid, full, thumb}); }catch(_){} } }
     toast(`“${name}” projesi içe aktarıldı`); render();
   }catch(_){ toast('Geçersiz yedek dosyası','err'); }
@@ -1589,12 +1591,13 @@ function viewCollar(h, isNew){
   </form>`;
 }
 function viewHole(h){
-  const tabs=[['collar','Kuyu bilgisi'],['lith','Log ('+h.lith.length+')'],['samp','Numune ('+h.samp.length+')'],['qc','QA/QC ('+(h.qc||[]).length+')'],['list','Örnekleme listesi'],['survey','Survey ('+h.survey.length+')'],['log','Grafik log']];
+  const tabs=[['collar','Kuyu bilgisi'],['lith','Log ('+h.lith.length+')'],['samp','Numune ('+h.samp.length+')'],['qc','QA/QC ('+(h.qc||[]).length+')'],['list','Örnekleme listesi'],['tenor',LG('Tenör / aralık','Assays / intercepts')],['survey','Survey ('+h.survey.length+')'],['log','Grafik log']];
   let body='';
   if(ui.htab==='collar') body=viewCollar(h,false).replace('<div class="topbar"><h1>Kuyu bilgileri</h1></div>','');
   else if(ui.htab==='log') body=viewLog(h);
   else if(ui.htab==='lith') body=logGrid(h);
   else if(ui.htab==='list') body=viewSheet(h);
+  else if(ui.htab==='tenor') body=viewTenor(h);
   else body=ivEditor(h, ui.htab);
   return `
   <div class="topbar"><button class="btn ghost sm" data-act="holesBack">←</button><h1>${esc(h.id)}</h1><span class="muted small">${esc(h.saha||'')} · EOH ${esc(h.eoh||'—')} m</span></div>
@@ -1629,7 +1632,7 @@ function seqWarnings(h){
 }
 const bySeq = (a,b) => String(a.id).localeCompare(String(b.id),'tr',{numeric:true});
 function qcFields(h){
-  const refs=[...new Set([...DB.holes.flatMap(x=>(x.qc||[]).map(q=>q.ref)).filter(Boolean),'OREAS 501d','OREAS 504c','OREAS 239','OREAS 22h (blank)'])];
+  const refs=[...new Set([...crmGroups().keys(), ...DB.holes.flatMap(x=>(x.qc||[]).map(q=>q.ref)).filter(Boolean)])];
   return IV.qc.fields.map(f=>f.k==='ref'?{...f, o:[...refs, ...h.samp.map(x=>x.id)]}:f);
 }
 function lastTo(rows){ return rows.reduce((m,r)=>Math.max(m, +r.to||0), 0); }
@@ -1644,11 +1647,12 @@ function ivEditor(h, key){
   const w=key==='survey'?[]:key==='qc'?seqWarnings(h):ivWarnings(h,key).concat(seqWarnings(h));
   const fields=key==='qc'?qcFields(h):c.fields;
   const seqInfo=(key==='samp'||key==='qc')?`<div class="banner" style="margin:0 0 12px">${h.firstId?LG(`Numaralar <b>${esc(h.firstId)}</b>’den başlayıp ardışık gider. Sıradaki numara: <b>${esc(nextDrillId(h))}</b>`,`Numbers start at <b>${esc(h.firstId)}</b> and run sequentially. Next number: <b>${esc(nextDrillId(h))}</b>`):LG(`Bu kuyu için <b>ilk numune no</b> girilmemiş; numaralar genel sayaçtan (${esc(fmtId('DC',1))} biçiminde) veriliyor.`,`No <b>first sample no.</b> has been entered for this hole; numbers come from the general counter (format ${esc(fmtId('DC',1))}).`)} <button type="button" class="btn ghost sm" data-act="htab" data-t="collar" style="margin-left:6px">${h.firstId?LG('İlk numune no’yu değiştir','Change first sample no.'):LG('İlk numune no’yu gir','Enter first sample no.')}</button></div>`:'';
-  return `${seqInfo}
+  const crmPick=key==='qc'&&crmGroups().size?`<div class="row" style="margin:0 0 10px;gap:6px"><span class="small muted">${LG('Standart seç:','Pick standard:')}</span>${[...crmGroups().keys()].map(n=>`<button type="button" class="chip ${base.ref===n?'on':''}" data-act="crmPick" data-n="${esc(n)}">${esc(n)}</button>`).join('')}</div>`:'';
+  return `${key==='qc'?crmCard():''}${seqInfo}
   <form class="card" data-form="iv" data-key="${key}" autocomplete="off" style="${ei!=null?'border:2px solid var(--acc)':''}">
     <h2>${ei!=null?(key==='qc'?'QC örneğini düzenle':'Aralığı düzenle'):'Yeni '+(key==='survey'?'ölçüm':key==='qc'?'QA/QC örneği':'aralık')}</h2>
     ${key==='qc'?'<p class="muted small" style="margin:-4px 0 10px">Standart ve blank için CRM / blank adını, duplikat için asıl numune numarasını referansa yazın. Asıl numune seçilirse derinlikler otomatik doldurulur.</p>':''}
-    <div class="grid">${fields.map(f=>fieldHTML(f, base[f.k], key)).join('')}</div>
+    ${crmPick}<div class="grid">${fields.map(f=>fieldHTML(f, base[f.k], key)).join('')}</div>
     <div class="row" style="margin-top:12px">
       <button class="btn acc big">${ei!=null?'Güncelle':'Ekle'}</button>
       ${ei!=null?'<button type="button" class="btn ghost" data-act="ivCancel">Vazgeç</button><button type="button" class="btn danger" data-act="ivDel">Sil</button>':''}
@@ -1942,7 +1946,7 @@ function viewLog(h){
   return `<div class="card">
     <div class="row" style="justify-content:space-between;margin-bottom:10px"><h2 style="margin:0">Grafik log – ${esc(h.id)}</h2>
     <label class="row small">Ölçek <select data-on="scale" style="width:auto;min-height:34px;padding:4px 8px">${[2,4,8,16].map(s=>`<option value="${s}" ${ui.scale==s?'selected':''}>1 m = ${s} px</option>`).join('')}</select></label></div>
-    <div class="logwrap">${stripLog(h)}</div>
+    <div class="logwrap">${(DB.geochem.length&&assayIdx.key!==assayKeyNow()&&(ensureAssayIndex().then(()=>{ if(ui.view==='sondaj'&&ui.htab==='log') render(); }),true),'')}${stripLog(h)}</div>
     <div class="legend" style="margin-top:10px">${[...new Set(h.lith.flatMap(r=>[r.lit1,r.lit2,r.lit3]).filter(Boolean))].map(l=>`<span><i class="dot" style="background:${lithColor(l)}"></i>${esc(l)}</span>`).join('')}</div>
   </div>`;
 }
@@ -1950,10 +1954,11 @@ function stripLog(h){
   const s=+ui.scale||4;
   const max=Math.max(+h.eoh||0, lastTo(h.lith), lastTo(h.samp), 10);
   const top=48, H=Math.ceil(top+max*s+24);
-  const X={d:0,l:52,k:228,a:318,m:428,r:498,s:600}, W=760;
+  const AS=assayStrip(h);
+  const X={d:0,l:52,k:228,a:318,m:428,r:498,s:600,g:760}, W=AS?900:760;
   const y=v=>top+v*s;
   let g=`<rect width="${W}" height="${H}" fill="#fff"/>`;
-  const hd=[['Derinlik',X.d+4],['Litoloji 1 · 2 · 3',X.l+4],['Marker',X.k+4],['Alterasyon',X.a+4],['Cevher %',X.m+4],['Recovery / RQD',X.r+4],['Numune',X.s+4]];
+  const hd=[['Derinlik',X.d+4],['Litoloji 1 · 2 · 3',X.l+4],['Marker',X.k+4],['Alterasyon',X.a+4],['Cevher %',X.m+4],['Recovery / RQD',X.r+4],['Numune',X.s+4],...(AS?[[`${AS.P.el} (${AS.P.unit})`,X.g+4]]:[])];
   g+=hd.map(([t,x])=>`<text x="${x}" y="20" font-size="11" font-weight="700" fill="#444">${t}</text>`).join('');
   g+=`<text x="${X.r+4}" y="36" font-size="9" fill="#888">0 ——— 100%</text><text x="${X.m+4}" y="36" font-size="9" fill="#888">0 —— 10%</text>`;
   g+=`<rect x="${X.r+4}" y="40" width="8" height="5" fill="#9cc3dd"/><text x="${X.r+15}" y="45" font-size="8" fill="#888">rec</text><rect x="${X.r+36}" y="40" width="8" height="5" fill="#2b6f9e"/><text x="${X.r+47}" y="45" font-size="8" fill="#888">RQD</text>`;
@@ -1980,9 +1985,14 @@ function stripLog(h){
   [...h.samp, ...(h.qc||[]).filter(q=>q.from!==''&&q.from!=null&&q.to!==''&&q.to!=null)].forEach(r=>{
     const a=+r.from, b=+r.to; if(isNaN(a)||isNaN(b)||b<=a) return;
     const yy=y(a), hh=(b-a)*s, qc=/Standart|Blank|duplikat/i.test(r.tip||'');
-    g+=`<rect x="${X.s}" y="${yy}" width="${W-X.s-6}" height="${hh}" fill="${qc?'#f5d6d2':'#e3efe6'}" stroke="#2f7a4a" stroke-width=".6"><title>${esc(r.id)} ${a}–${b} m</title></rect>`;
+    g+=`<rect x="${X.s}" y="${yy}" width="${154}" height="${hh}" fill="${qc?'#f5d6d2':'#e3efe6'}" stroke="#2f7a4a" stroke-width=".6"><title>${esc(r.id)} ${a}–${b} m</title></rect>`;
     if(hh>=10) g+=`<text x="${X.s+4}" y="${yy+Math.min(hh/2+4,13)}" font-size="${hh>=12?10:8.5}" fill="#1d3a26">${esc(r.id)}</text>`;
   });
+  if(AS){ const bw=126, xs=v=>v>0?Math.max(2,Math.min(bw,(Math.log10(v)-AS.lo)/(AS.hi-AS.lo)*bw)):2, cut=+AS.P.cut;
+    g+=`<text x="${X.g+4}" y="36" font-size="9" fill="#888">log · ${LG('alt tenör','cut-off')} ${esc(AS.P.cut)}</text>`;
+    AS.S.forEach(r=>{ const yy=y(r.from), hh=(r.to-r.from)*s, hiG=r.v>=+AS.P.hi&&+AS.P.hi>cut; g+=`<rect x="${X.g}" y="${yy}" width="${xs(r.v)}" height="${hh}" fill="${hiG?'#9e0a26':r.v>=cut?'#e4572e':'#c9b79c'}" stroke="#fff" stroke-width=".4"><title>${esc(r.id)}: ${fmtG(r.v,AS.P.unit)} ${esc(AS.P.unit)} ${esc(AS.P.el)}</title></rect>`;
+      if(hh>=11 && r.v>=cut) g+=`<text x="${X.g+xs(r.v)+3}" y="${yy+Math.min(hh/2+4,13)}" font-size="9.5" font-weight="700" fill="#9e0a26">${fmtG(r.v,AS.P.unit)}</text>`; });
+    if(cut>0&&Math.log10(cut)>AS.lo){ const cx=X.g+xs(cut); g+=`<line x1="${cx}" x2="${cx}" y1="${top}" y2="${H-20}" stroke="#9e0a26" stroke-dasharray="3 3" stroke-width=".8"/>`; } }
   if(+h.eoh) g+=`<line x1="0" x2="${W}" y1="${y(+h.eoh)}" y2="${y(+h.eoh)}" stroke="#b03a2e" stroke-width="1.5" stroke-dasharray="5 3"/><text x="4" y="${y(+h.eoh)+14}" font-size="10" fill="#b03a2e" font-weight="700">EOH ${h.eoh} m</text>`;
   return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block">${g}</svg>`;
 }
@@ -2392,12 +2402,13 @@ function viewGeochem(){
   const key=ui.gx.ds.join(',');
   if(ui.gx.key!==key || !ui.gx.rows){ gcEnsure().then(()=>{ if(ui.view==='jeokimya') render(); }); return head+'<div class="card empty">'+LG('Veriler yükleniyor…','Loading data…')+'</div>'; }
   if(!ui.gx.els.includes(ui.gx.el)) ui.gx.el=ui.gx.els.includes('Au')?'Au':ui.gx.els[0];
-  const t=ui.gx.el, tabs=[['stats','İstatistik'],['corr','Korelasyon'],['map','Tematik harita'],['anom','Anomaliler']];
+  const t=ui.gx.el, tabs=[['stats','İstatistik'],['corr','Korelasyon'],['map','Tematik harita'],['anom','Anomaliler'],['qaqc','QA/QC']];
   const elSel=`<label class="fld" style="max-width:170px"><span>Element</span><select data-on="gcEl">${ui.gx.els.map(e=>`<option value="${esc(e)}" ${e===t?'selected':''}>${esc(e)} (${esc(ui.gx.unit[e])})</option>`).join('')}</select></label>`;
   let body='';
   if(ui.gx.tab==='stats') body=gcStatsView();
   else if(ui.gx.tab==='corr') body=gcCorrView(t, elSel);
   else if(ui.gx.tab==='map') body=gcMapView(t, elSel);
+  else if(ui.gx.tab==='qaqc') body=gcQaqcView(t, elSel);
   else body=gcAnomView(t, elSel);
   const nXY=ui.gx.rows.filter(r=>r.lat!=null).length;
   return head+`<div class="card">
@@ -2609,6 +2620,476 @@ function gcAnomCSV(){
     L.map(r=>[r.id, r.v[t], r.ds, r.lat, r.lon, r.E, r.N, ...ui.gx.els.filter(e=>e!==t).map(e=>r.v[e]??'')]));
 }
 
+
+/* ===================== TENÖR / INTERCEPT (sondaj) ===================== */
+let assayIdx={key:null, map:new Map(), units:{}, els:[]};
+async function ensureAssayIndex(){
+  const key=DB.geochem.map(d=>d._u+':'+d.n).join(',');
+  if(assayIdx.key===key) return assayIdx;
+  const map=new Map(), units={}, els=[];
+  for(const d of DB.geochem){
+    const rows=await gcGet(d._u)||[];
+    d.els.forEach(e=>{ if(!(e.el in units)){ units[e.el]=e.unit; els.push(e.el); } });
+    const f={}; d.els.forEach(e=>{ f[e.el]=(UNIT_PPM[e.unit]||1)/(UNIT_PPM[units[e.el]]||1); });
+    rows.forEach(r=>{ const k=String(r.id).trim().toLowerCase(); const o=map.get(k)||{v:{}, bdl:new Set(), ds:d.name};
+      for(const el in r.v) o.v[el]=r.v[el]*(f[el]||1); (r.bdl||[]).forEach(b=>o.bdl.add(b)); o.ds=d.name; map.set(k,o); });
+  }
+  assayIdx={key, map, units, els}; return assayIdx;
+}
+const assayKeyNow = () => DB.geochem.map(d=>d._u+':'+d.n).join(',');
+const assayOf = id => assayIdx.map.get(String(id||'').trim().toLowerCase());
+const PREC=['Au','Ag','Pt','Pd'];
+function repUnitDefault(el){ if(PREC.includes(el)) return 'g/t'; if(['Cu','Pb','Zn','Ni','Fe','Mn','S'].includes(el)) return '%'; return 'ppm'; }
+const convU = (v, from, to) => v==null ? null : v*(UNIT_PPM[from]||1)/(UNIT_PPM[to]||1);
+function icSettings(){ DB.settings.ic=DB.settings.ic||{el:'Au', unit:'g/t', cut:0.5, hi:2, dil:2, min:1}; return DB.settings.ic; }
+function holeAssaySeries(h, el, unit){
+  const from=assayIdx.units[el];
+  return h.samp.filter(r=>r.from!==''&&r.to!==''&&+r.to>+r.from).slice().sort((a,b)=>a.from-b.from).map(r=>{ const a=assayOf(r.id); const raw=a?a.v[el]:null;
+    return {from:+r.from, to:+r.to, id:r.id, v: raw==null?null:convU(raw,from,unit), bdl:!!(a&&a.bdl.has(el)), has:!!a}; });
+}
+function calcIntercepts(S, cut, maxDil, minLen){
+  const res=[], cont=(a,b)=>Math.abs(S[b].from-S[a].to)<0.05;
+  const comp=(a,b)=>{ let L=0,G=0; for(let t=a;t<=b;t++){ const l=S[t].to-S[t].from; L+=l; G+=l*S[t].v; } return {from:S[a].from, to:S[b].to, len:L, g:L?G/L:0, n:b-a+1}; };
+  let i=0;
+  while(i<S.length){
+    if(!(S[i].v!=null && S[i].v>=cut)){ i++; continue; }
+    let end=i, j=i+1;
+    while(j<S.length && cont(j-1,j) && S[j].v!=null){
+      if(S[j].v>=cut){ end=j; j++; continue; }
+      let k=j, dl=0; while(k<S.length && cont(k-1,k) && S[k].v!=null && S[k].v<cut){ dl+=S[k].to-S[k].from; k++; }
+      if(k<S.length && cont(k-1,k) && S[k].v!=null && S[k].v>=cut && dl<=maxDil+1e-9 && comp(i,k).g>=cut){ end=k; j=k+1; continue; }
+      break;
+    }
+    const c=comp(i,end); if(c.len>=minLen-1e-9) res.push({...c, a:i, b:end}); i=end+1;
+  }
+  return res;
+}
+const fmtG = (v,u) => v==null?'—':(u==='%'? v.toFixed(2) : v>=100? v.toFixed(0) : v>=10? v.toFixed(1) : v.toFixed(2));
+function interceptText(h, c, el, unit, incl){
+  const L=c.len.toFixed(2), G=fmtG(c.g,unit);
+  const inc=(incl||[]).map(x=>LG(`${x.len.toFixed(2)} m @ ${fmtG(x.g,unit)} ${unit} ${el} (${fm(x.from)}–${fm(x.to)} m)`,`${x.len.toFixed(2)} m @ ${fmtG(x.g,unit)} ${unit} ${el} from ${fm(x.from)} m`)).join('; ');
+  return LG(`${h.id}: ${L} m @ ${G} ${unit} ${el} (${fm(c.from)}–${fm(c.to)} m)${inc?`, içinde ${inc}`:''}`,
+            `${h.id}: ${L} m @ ${G} ${unit} ${el} from ${fm(c.from)} m${inc?` (incl. ${inc})`:''}`);
+}
+function holeIntercepts(h, P){
+  const S=holeAssaySeries(h, P.el, P.unit), IC=calcIntercepts(S, +P.cut, +P.dil, +P.min);
+  IC.forEach(c=>{ c.incl = (+P.hi>+P.cut) ? calcIntercepts(S.slice(c.a,c.b+1), +P.hi, 0, 0).filter(x=>x.len<c.len-1e-6) : []; c.text=interceptText(h,c,P.el,P.unit,c.incl); });
+  return {S, IC};
+}
+function viewTenor(h){
+  if(!DB.geochem.length) return `<div class="card empty">${LG('Henüz laboratuvar sonucu yok. Önce <b>Jeokimya</b> bölümünden sondaj numunelerinin sonuçlarını CSV olarak içe aktarın; CSV’deki örnek no sütunu numune numaralarıyla (ör. KRB12001) aynı olmalı.','No laboratory results yet. First import the drill sample results as CSV in <b>Geochemistry</b>; the sample number column must match the sample numbers (e.g. KRB12001).')}<br><br><button class="btn acc" data-act="go" data-v="jeokimya">${LG('Jeokimya’ya git','Go to Geochemistry')}</button></div>`;
+  if(assayIdx.key!==assayKeyNow()){ ensureAssayIndex().then(()=>{ if(ui.view==='sondaj' && ui.htab==='tenor') render(); }); return `<div class="card empty">${LG('Sonuçlar yükleniyor…','Loading results…')}</div>`; }
+  const P=icSettings();
+  const avail=assayIdx.els.filter(el=>h.samp.some(r=>{ const a=assayOf(r.id); return a && a.v[el]!=null; }));
+  if(!avail.length) return `<div class="card empty">${LG(`Bu kuyunun numune numaralarıyla eşleşen laboratuvar sonucu bulunamadı. İçe aktardığınız CSV’deki örnek numaralarını kontrol edin (ör. ${esc((h.samp[0]||{}).id||'KRB12001')}).`,`No laboratory results match the sample numbers of this hole. Check the sample numbers in the imported CSV (e.g. ${esc((h.samp[0]||{}).id||'KRB12001')}).`)}</div>`;
+  if(!avail.includes(P.el)){ P.el=avail.includes('Au')?'Au':avail[0]; P.unit=repUnitDefault(P.el); }
+  const {S, IC}=holeIntercepts(h,P);
+  const matched=S.filter(x=>x.has).length, missing=S.filter(x=>!x.has);
+  const units=['g/t','ppm','ppb','%'];
+  return `<div class="card"><div class="row" style="align-items:flex-end">
+      <label class="fld" style="max-width:130px"><span>Element</span><select data-on="icSet" data-k="el">${avail.map(e=>`<option ${e===P.el?'selected':''}>${esc(e)}</option>`).join('')}</select></label>
+      <label class="fld" style="max-width:110px"><span>${LG('Birim','Unit')}</span><select data-on="icSet" data-k="unit">${units.map(u=>`<option ${u===P.unit?'selected':''}>${u}</option>`).join('')}</select></label>
+      <label class="fld" style="max-width:150px"><span>${LG('Alt tenör (cut-off)','Cut-off grade')}</span><input type="number" step="any" data-on="icSet" data-k="cut" value="${esc(P.cut)}"></label>
+      <label class="fld" style="max-width:170px"><span>${LG('Yüksek tenör (içinde)','High grade (incl.)')}</span><input type="number" step="any" data-on="icSet" data-k="hi" value="${esc(P.hi)}"></label>
+      <label class="fld" style="max-width:190px"><span>${LG('İç seyrelme, en fazla (m)','Max internal dilution (m)')}</span><input type="number" step="any" data-on="icSet" data-k="dil" value="${esc(P.dil)}"></label>
+      <label class="fld" style="max-width:150px"><span>${LG('En kısa aralık (m)','Min. interval (m)')}</span><input type="number" step="any" data-on="icSet" data-k="min" value="${esc(P.min)}"></label>
+    </div>
+    <p class="muted small" style="margin:8px 0 0">${LG('Aralıklar uzunluk ağırlıklı ortalama ile hesaplanır. Alt tenörün altındaki numuneler, toplam uzunlukları “iç seyrelme” sınırını aşmıyorsa ve birleşik tenör alt tenörün üstünde kalıyorsa aralığa dahil edilir. Sonucu olmayan ya da ardışık olmayan numuneler aralığı keser.','Intervals are length-weighted. Samples below cut-off are included if their total length does not exceed the internal dilution limit and the composite grade stays above cut-off. Samples without results or non-contiguous samples break an interval.')}</p></div>
+  <div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${LG('Önemli aralıklar','Significant intercepts')} (${IC.length})</h2>
+      <span class="muted small">${matched}/${S.length} ${LG('numunenin sonucu var','samples have results')}</span></div>
+    ${IC.length?`<div style="margin-top:10px">${IC.map(c=>`<div class="banner" style="margin:6px 0;font-size:14.5px"><b>${esc(c.text)}</b>${c.g*c.len&&PREC.includes(P.el)&&P.unit==='g/t'?` <span class="muted small">· ${(c.g*c.len).toFixed(1)} gram-metre</span>`:''}</div>`).join('')}</div>
+      <div class="row" style="margin-top:8px"><button class="btn ghost sm" data-act="icCopy">${LG('Metni kopyala','Copy text')}</button></div>`
+      :`<p class="muted">${LG(`Bu ayarlarla ${esc(P.cut)} ${esc(P.unit)} ${esc(P.el)} üzerinde aralık yok.`,`No intercepts above ${esc(P.cut)} ${esc(P.unit)} ${esc(P.el)} with these settings.`)}</p>`}
+    ${missing.length?`<div class="warns">⚠ ${LG(`Sonucu olmayan numuneler (${missing.length}): `,`Samples without results (${missing.length}): `)}${esc(missing.slice(0,12).map(x=>x.id).join(', '))}${missing.length>12?' …':''}</div>`:''}
+  </div>
+  <div class="card"><h2>${LG('Numune sonuçları','Sample results')}</h2><div class="tblwrap"><table class="cards sheet"><thead><tr><th>From</th><th>To</th><th>${LG('Boy','Length')}</th><th>${LG('Numune no','Sample no.')}</th><th>${esc(P.el)} (${esc(P.unit)})</th><th></th></tr></thead><tbody>
+    ${S.map(x=>{ const inI=IC.some(c=>x.from>=c.from-1e-6&&x.to<=c.to+1e-6); return `<tr style="${inI?'background:#fbeee3':''}"><td data-l="From">${fm(x.from)}</td><td data-l="To">${fm(x.to)}</td><td data-l="${LG('Boy','Length')}">${(x.to-x.from).toFixed(2)}</td><td data-l="${LG('Numune','Sample')}"><b>${esc(x.id)}</b></td><td data-l="${esc(P.el)}" style="${x.v!=null&&x.v>=+P.cut?'font-weight:800;color:#9e0a26':''}">${x.v==null?'—':(x.bdl?'&lt;':'')+fmtG(x.v,P.unit)}</td><td class="nolabel small muted">${inI?LG('aralıkta','in intercept'):''}</td></tr>`; }).join('')}
+  </tbody></table></div></div>`;
+}
+function assayStrip(h){
+  if(assayIdx.key!==assayKeyNow() || !DB.geochem.length) return null;
+  const P=icSettings(), S=holeAssaySeries(h,P.el,P.unit).filter(x=>x.v!=null);
+  if(!S.length) return null;
+  const pos=S.map(x=>x.v).filter(v=>v>0); const lo=Math.log10(Math.max(Math.min(...pos)||0.001, 1e-4)), hi=Math.log10(Math.max(...pos, +P.cut||1));
+  return {S, P, lo, hi:hi>lo?hi:lo+1};
+}
+function assayCSV(){
+  const els=assayIdx.els, U=assayIdx.units;
+  return toCSV(['HOLEID','FROM','TO','SAMPLE_ID',...els.map(e=>`${e}_${(U[e]||'').replace('%','PCT').replace('/','')}`)],
+    DB.holes.flatMap(h=>h.samp.map(r=>{ const a=assayOf(r.id); return [h.id,r.from,r.to,r.id,...els.map(e=>a&&a.v[e]!=null?a.v[e]:'')]; })));
+}
+function interceptsCSV(){
+  const P=icSettings(), rows=[];
+  DB.holes.forEach(h=>{ holeIntercepts(h,P).IC.forEach(c=>{ rows.push([h.id,fm(c.from),fm(c.to),c.len.toFixed(2),fmtG(c.g,P.unit),P.unit,P.el,c.n,PREC.includes(P.el)&&P.unit==='g/t'?(c.g*c.len).toFixed(2):'',c.text]); }); });
+  return toCSV(['HOLEID','FROM','TO','LENGTH_M','GRADE','UNIT','ELEMENT','N_SAMPLES','GRAM_METRE','TEXT'], rows);
+}
+
+/* ===================== QA/QC ===================== */
+function qcItems(){
+  const out=[];
+  DB.holes.forEach(h=>(h.qc||[]).forEach(q=>out.push({id:q.id, tip:q.tip||'', ref:q.ref||'', src:h.id})));
+  DB.samples.filter(s=>s.type==='QC').forEach(s=>out.push({id:s.id, tip:s.qctip||'', ref:(/duplikat/i.test(s.qctip||'')?s.asil:s.crm)||s.crm||s.asil||'', src:LG('Yüzey','Surface')}));
+  return out;
+}
+const qcKind = t => /Standart/i.test(t)?'std' : /Blank/i.test(t)?'blk' : /Saha/i.test(t)?'fdup' : /Kaba|coarse/i.test(t)?'cdup' : /Pulp|Hazırlık/i.test(t)?'pdup' : 'other';
+function crmList(){ DB.settings.crms=DB.settings.crms||[]; return DB.settings.crms; }
+function approxDL(el){ const v=[...assayIdx.map.values()].map(o=>o.v[el]).filter(x=>x>0).sort((a,b)=>a-b); return v.length?v[0]:null; }
+function ctrlChartSVG(pts, mean, sd, unit, title){
+  const W=620,H=250,m={l:58,r:34,t:16,b:44}; if(!pts.length) return '';
+  const vals=pts.map(p=>p.v).concat([mean+3.5*sd, mean-3.5*sd]); let y0=Math.min(...vals), y1=Math.max(...vals); if(y1-y0<1e-9){ y0-=1; y1+=1; }
+  const X=i=>m.l+(pts.length===1?0.5:i/(pts.length-1))*(W-m.l-m.r), Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  let g=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="#fff" stroke="#ccc"/>`;
+  [[3,'#c0392b','3SD'],[2,'#e0a030','2SD']].forEach(([k,c,l])=>{ [1,-1].forEach(sg=>{ const yv=mean+sg*k*sd; g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(yv)}" y2="${Y(yv)}" stroke="${c}" stroke-dasharray="5 3"/><text x="${W-m.r-2}" y="${Y(yv)-3}" font-size="9.5" text-anchor="end" fill="${c}">${sg>0?'+':'−'}${l} ${fmtv(yv)}</text>`; }); });
+  g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(mean)}" y2="${Y(mean)}" stroke="#2f7a4a" stroke-width="1.5"/><text x="${m.l+4}" y="${Y(mean)-4}" font-size="10" fill="#2f7a4a">${LG('sertifika','certified')} ${fmtv(mean)} ${esc(unit)}</text>`;
+  for(let k=0;k<=4;k++){ const v=y0+(y1-y0)*k/4; g+=`<text x="${m.l-5}" y="${Y(v)+3}" font-size="10" text-anchor="end">${fmtv(v)}</text>`; }
+  g+=`<polyline points="${pts.map((p,i)=>`${X(i).toFixed(1)},${Y(p.v).toFixed(1)}`).join(' ')}" fill="none" stroke="#999" stroke-width=".8"/>`;
+  pts.forEach((p,i)=>{ const z=Math.abs(p.v-mean)/sd, c=z>3?'#c0392b':z>2?'#e0a030':'#2f7a4a'; g+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="4" fill="${c}" stroke="#fff"><title>${esc(p.id)}: ${fmtv(p.v)} ${esc(unit)} (${(p.v-mean>=0?'+':'')+((p.v-mean)/sd).toFixed(1)} SD)</title></circle>`;
+    if(pts.length<=30) g+=`<text transform="translate(${X(i).toFixed(1)} ${H-m.b+10}) rotate(45)" font-size="8.5" fill="#666">${esc(String(p.id).slice(-6))}</text>`; });
+  g+=`<text x="${m.l}" y="11" font-size="11.5" font-weight="700">${esc(title)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${g}</svg>`;
+}
+function blankChartSVG(pts, lim, unit){
+  const W=620,H=220,m={l:58,r:34,t:14,b:40}; if(!pts.length) return '';
+  const y1=Math.max(lim*1.5, ...pts.map(p=>p.v))*1.05, X=i=>m.l+(pts.length===1?0.5:i/(pts.length-1))*(W-m.l-m.r), Y=v=>H-m.b-v/y1*(H-m.t-m.b);
+  let g=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="#fff" stroke="#ccc"/><line x1="${m.l}" x2="${W-m.r}" y1="${Y(lim)}" y2="${Y(lim)}" stroke="#c0392b" stroke-dasharray="5 3"/><text x="${W-m.r-2}" y="${Y(lim)-3}" font-size="10" text-anchor="end" fill="#c0392b">${LG('eşik','limit')} ${fmtv(lim)} ${esc(unit)}</text>`;
+  for(let k=0;k<=4;k++){ const v=y1*k/4; g+=`<text x="${m.l-5}" y="${Y(v)+3}" font-size="10" text-anchor="end">${fmtv(v)}</text>`; }
+  pts.forEach((p,i)=>{ g+=`<circle cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="4" fill="${p.v>lim?'#c0392b':'#2f7a4a'}" stroke="#fff"><title>${esc(p.id)}: ${fmtv(p.v)} ${esc(unit)}</title></circle>`;
+    if(pts.length<=30) g+=`<text transform="translate(${X(i).toFixed(1)} ${H-m.b+10}) rotate(45)" font-size="8.5" fill="#666">${esc(String(p.id).slice(-6))}</text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${g}</svg>`;
+}
+function dupScatterSVG(P, unit){
+  const W=330,H=300,m={l:50,r:10,t:10,b:40}; const all=P.flatMap(p=>[p.a,p.b]).filter(v=>v>0); if(!all.length) return '';
+  let lo=Math.floor(Math.log10(Math.min(...all))*2)/2, hi=Math.ceil(Math.log10(Math.max(...all))*2)/2; if(hi-lo<1){ lo-=0.5; hi+=0.5; }
+  const X=v=>m.l+(Math.log10(v)-lo)/(hi-lo)*(W-m.l-m.r), Y=v=>H-m.b-(Math.log10(v)-lo)/(hi-lo)*(H-m.t-m.b), A=Math.pow(10,lo), B=Math.pow(10,hi);
+  let g=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="#fff" stroke="#ccc"/>`;
+  for(let v=Math.ceil(lo);v<=hi;v++){ g+=`<text x="${X(Math.pow(10,v))}" y="${H-m.b+13}" font-size="9.5" text-anchor="middle">${fmtv(Math.pow(10,v))}</text><text x="${m.l-4}" y="${Y(Math.pow(10,v))+3}" font-size="9.5" text-anchor="end">${fmtv(Math.pow(10,v))}</text>`; }
+  g+=`<line x1="${X(A)}" y1="${Y(A)}" x2="${X(B)}" y2="${Y(B)}" stroke="#26302a"/>`;
+  [[1.2,'#e0a030'],[1/1.2,'#e0a030']].forEach(([f,c])=>{ g+=`<line x1="${X(A)}" y1="${Y(A*f)}" x2="${X(B)}" y2="${Y(B*f)}" stroke="${c}" stroke-dasharray="4 3"/>`; });
+  P.forEach(p=>{ if(p.a>0&&p.b>0) g+=`<circle cx="${X(p.a).toFixed(1)}" cy="${Y(p.b).toFixed(1)}" r="3.5" fill="#2b6f9e" fill-opacity=".7"><title>${esc(p.o)} / ${esc(p.d)}: ${fmtv(p.a)} / ${fmtv(p.b)}</title></circle>`; });
+  g+=`<text x="${(m.l+W-m.r)/2}" y="${H-5}" font-size="10.5" text-anchor="middle" font-weight="700">${LG('Asıl','Original')} (${esc(unit)})</text><text transform="translate(12 ${(m.t+H-m.b)/2}) rotate(-90)" font-size="10.5" text-anchor="middle" font-weight="700">${LG('Duplikat','Duplicate')} (${esc(unit)})</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${g}</svg>`;
+}
+function hardSVG(P){
+  const W=330,H=300,m={l:44,r:12,t:10,b:40}, Hs=P.map(p=>p.hard).sort((a,b)=>a-b); if(!Hs.length) return '';
+  const yMax=Math.max(40, Math.ceil(Hs[Hs.length-1]/10)*10), X=f=>m.l+f*(W-m.l-m.r), Y=v=>H-m.b-Math.min(v,yMax)/yMax*(H-m.t-m.b);
+  let g=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="#fff" stroke="#ccc"/>`;
+  [10,20,30].forEach(v=>{ g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v===10?'#2f7a4a':v===20?'#e0a030':'#c0392b'}" stroke-dasharray="4 3"/><text x="${m.l-4}" y="${Y(v)+3}" font-size="9.5" text-anchor="end">${v}%</text>`; });
+  [0,25,50,75,90,100].forEach(p=>{ g+=`<text x="${X(p/100)}" y="${H-m.b+13}" font-size="9.5" text-anchor="middle">${p}</text>`; });
+  g+=`<polyline points="${Hs.map((v,i)=>`${X(Hs.length===1?1:i/(Hs.length-1)).toFixed(1)},${Y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="#b4532a" stroke-width="2"/>`;
+  g+=`<text x="${(m.l+W-m.r)/2}" y="${H-5}" font-size="10.5" text-anchor="middle" font-weight="700">${LG('Persentil (çiftlerin %)','Percentile (% of pairs)')}</text><text transform="translate(11 ${(m.t+H-m.b)/2}) rotate(-90)" font-size="10.5" text-anchor="middle" font-weight="700">HARD %</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${g}</svg>`;
+}
+function gcQaqcView(t, elSel){
+  if(assayIdx.key!==assayKeyNow()){ ensureAssayIndex().then(()=>{ if(ui.view==='jeokimya' && ui.gx.tab==='qaqc') render(); }); return `<div class="card empty">${LG('Yükleniyor…','Loading…')}</div>`; }
+  const unit=assayIdx.units[t]||'', items=qcItems(), val=id=>{ const a=assayOf(id); return a?a.v[t]:null; };
+  const C=crmList();
+  // standartlar
+  const stdGroups={}; items.filter(q=>qcKind(q.tip)==='std').forEach(q=>{ const v=val(q.id); if(v==null) return; const k=q.ref||LG('(adsız)','(unnamed)'); (stdGroups[k]=stdGroups[k]||[]).push({id:q.id, v}); });
+  const stdHTML=Object.keys(stdGroups).length? Object.entries(stdGroups).map(([name,pts])=>{
+    pts.sort(bySeq); const c=C.find(x=>x.name===name && x.el===t);
+    if(!c) return `<div class="card"><h3 style="margin-top:0">${esc(name)} · ${esc(t)} (${pts.length})</h3><p class="small">${LG('Bu standart için sertifika değeri girilmemiş. Değerleri sertifikasından yazın:','No certified value has been entered for this standard. Enter the values from its certificate:')}</p>
+      <div class="row" style="align-items:flex-end"><label class="fld" style="max-width:160px"><span>${LG('Sertifika değeri','Certified value')} (${esc(unit)})</span><input type="number" step="any" id="crm_m_${esc(name).replace(/\W/g,'_')}"></label><label class="fld" style="max-width:140px"><span>SD (${esc(unit)})</span><input type="number" step="any" id="crm_s_${esc(name).replace(/\W/g,'_')}"></label><button class="btn acc" data-act="crmAdd" data-n="${esc(name)}">${LG('Kaydet','Save')}</button><button class="btn ghost" data-act="crmEdit" data-n="${esc(name)}" ${C.some(x=>x.name===name)?'':'data-new="1"'}>${LG('Standart kütüphanesinde aç','Open in standards library')}</button></div>
+      <p class="muted small">${LG('Bulunan değerler','Found values')}: ${pts.map(p=>`${esc(p.id)} ${fmtv(p.v)}`).join(' · ')}</p></div>`;
+    const m=+c.mean*(UNIT_PPM[c.unit]||1)/(UNIT_PPM[unit]||1), sd=+c.sd*(UNIT_PPM[c.unit]||1)/(UNIT_PPM[unit]||1);
+    const nW=pts.filter(p=>Math.abs(p.v-m)>2*sd&&Math.abs(p.v-m)<=3*sd).length, nF=pts.filter(p=>Math.abs(p.v-m)>3*sd).length, avg=pts.reduce((s,p)=>s+p.v,0)/pts.length;
+    return `<div class="card">${ctrlChartSVG(pts,m,sd,unit,`${name} · ${t}`)}
+      <div class="row" style="margin-top:6px"><span class="pill">n=${pts.length}</span><span class="pill">${LG('ortalama','mean')} ${fmtv(avg)}</span><span class="pill ${Math.abs(avg/m-1)>0.05?'warn':'ok'}">bias ${((avg/m-1)*100).toFixed(1)}%</span><span class="pill ${nW?'warn':'ok'}">2–3SD: ${nW}</span><span class="pill ${nF?'err':'ok'}">&gt;3SD: ${nF}</span>
+      <button class="btn ghost sm" data-act="crmEdit" data-n="${esc(name)}" style="margin-left:auto">${LG('Sertifika değerlerini düzenle','Edit certified values')}</button></div>
+      ${nF?`<div class="warns">⚠ ${LG('3SD dışındaki standartlar','Standards outside 3SD')}: ${pts.filter(p=>Math.abs(p.v-m)>3*sd).map(p=>esc(p.id)).join(', ')} — ${LG('bu standardın çevresindeki partinin yeniden analizi düşünülebilir.','re-assaying the batch around this standard may be considered.')}</div>`:''}</div>`;
+  }).join('') : `<div class="card muted">${LG('Bu element için sonucu olan standart bulunamadı. Standartlar sondajda QA/QC sekmesinde veya yüzeyde QC örneği olarak kayıtlı olmalı ve laboratuvar CSV’sinde aynı numarayla yer almalı.','No standards with results for this element. Standards must be registered in the drill QA/QC tab or as surface QC samples, and appear with the same number in the lab CSV.')}</div>`;
+  // blank
+  const bl=items.filter(q=>qcKind(q.tip)==='blk').map(q=>({id:q.id, v:val(q.id)})).filter(p=>p.v!=null).sort(bySeq);
+  DB.settings.blankLim=DB.settings.blankLim||{}; const dl=approxDL(t); const lim=+DB.settings.blankLim[t]||(dl?dl*5:0);
+  const blHTML=bl.length?`<div class="card">${blankChartSVG(bl,lim,unit)}
+    <div class="row" style="align-items:flex-end;margin-top:6px"><label class="fld" style="max-width:200px"><span>${LG('Blank eşiği','Blank limit')} (${esc(unit)})</span><input type="number" step="any" data-on="blankLim" value="${esc(fmtv(lim))}"></label>
+    <span class="pill">n=${bl.length}</span><span class="pill ${bl.some(p=>p.v>lim)?'err':'ok'}">${LG('eşik üstü','above limit')}: ${bl.filter(p=>p.v>lim).length}</span></div>
+    <p class="muted small">${LG('Varsayılan eşik, verideki en düşük ölçülen değerin (yaklaşık tespit sınırı) 5 katıdır. Eşiği aşan blank, örnek hazırlamada bulaşmaya işaret edebilir.','The default limit is 5× the lowest measured value in the data (approx. detection limit). A blank above the limit may indicate contamination during preparation.')}</p></div>`
+    :`<div class="card muted">${LG('Sonucu olan blank bulunamadı.','No blanks with results.')}</div>`;
+  // duplikat
+  const excl=ui.gx.dupExcl!==false, dLim=(dl||0)*10;
+  const dups=items.filter(q=>['fdup','cdup','pdup'].includes(qcKind(q.tip))).map(q=>{ const a=val(q.ref), b=val(q.id); return {o:q.ref, d:q.id, k:qcKind(q.tip), a, b}; }).filter(p=>p.a!=null&&p.b!=null&&p.a>0&&p.b>0);
+  const dU=dups.filter(p=>!excl || (p.a+p.b)/2>=dLim); dU.forEach(p=>{ p.hard=Math.abs(p.a-p.b)/(p.a+p.b)*100; });
+  const pct=x=>dU.length?Math.round(dU.filter(p=>p.hard<=x).length/dU.length*100):0;
+  const kindName={fdup:LG('saha','field'), cdup:LG('kaba red','coarse'), pdup:'pulp'};
+  const dupHTML=dups.length?`<div class="two"><div class="card"><h3 style="margin-top:0">${LG('Asıl – duplikat','Original vs duplicate')}</h3>${dupScatterSVG(dU,unit)}<p class="muted small">${LG('Düz çizgi 1:1, kesikli çizgiler ±%20.','Solid line 1:1, dashed lines ±20%.')}</p></div>
+    <div class="card"><h3 style="margin-top:0">HARD</h3>${hardSVG(dU)}<p class="muted small">${LG('HARD = |a−b| / (a+b) × 100. Saha duplikatlarında çiftlerin ~%90’ının %20–30 altında, pulp duplikatlarında %10 altında olması beklenir.','HARD = |a−b| / (a+b) × 100. For field duplicates ~90% of pairs are expected below 20–30%, for pulp duplicates below 10%.')}</p></div></div>
+    <div class="card"><div class="row"><span class="pill">n=${dU.length}${excl&&dups.length!==dU.length?` (${dups.length-dU.length} ${LG('hariç','excluded')})`:''}</span><span class="pill">HARD ≤10%: ${pct(10)}%</span><span class="pill">≤20%: ${pct(20)}%</span><span class="pill">≤30%: ${pct(30)}%</span>
+      <label class="row small" style="gap:6px;margin-left:auto"><input type="checkbox" data-on="dupExcl" ${excl?'checked':''}> ${LG('Tespit sınırına yakın çiftleri hariç tut (ort. < 10×DL)','Exclude pairs near detection (mean < 10×DL)')}</label></div>
+      <div class="tblwrap" style="margin-top:8px"><table class="sheet" style="font-size:13px"><thead><tr><th>${LG('Asıl','Original')}</th><th>${LG('Duplikat','Duplicate')}</th><th>${LG('Tip','Type')}</th><th>${esc(t)} a</th><th>${esc(t)} b</th><th>HARD %</th></tr></thead><tbody>
+      ${dU.slice().sort((x,y)=>y.hard-x.hard).map(p=>`<tr><td>${esc(p.o)}</td><td>${esc(p.d)}</td><td>${kindName[p.k]}</td><td>${fmtv(p.a)}</td><td>${fmtv(p.b)}</td><td style="${p.hard>30?'color:#c0392b;font-weight:700':''}">${p.hard.toFixed(1)}</td></tr>`).join('')}</tbody></table></div></div>`
+    :`<div class="card muted">${LG('Asıl ve duplikat sonucu birlikte bulunan çift yok. Duplikatın “Referans” alanına asıl numune numarası yazılmış olmalı.','No pairs with both original and duplicate results. The duplicate’s “Reference” field must contain the original sample number.')}</div>`;
+  return `<div class="card"><div class="row" style="align-items:flex-end">${elSel}<span class="muted small">${LG('QA/QC tüm jeokimya veri setlerindeki sonuçları kullanır.','QA/QC uses results from all geochemistry datasets.')} ${items.length} ${LG('QC kaydı','QC records')}.</span></div></div>
+    <h2 style="margin:18px 0 8px">${LG('Standartlar (CRM)','Standards (CRM)')}</h2>${stdHTML}
+    <h2 style="margin:18px 0 8px">Blank</h2>${blHTML}
+    <h2 style="margin:18px 0 8px">${LG('Duplikatlar','Duplicates')}</h2>${dupHTML}`;
+}
+
+/* ===================== GENEL HARİTA MOTORU ===================== */
+function tileURL(base,z,x,y){ const n=1<<z; x=((x%n)+n)%n; if(base==='topo') return `https://${'abc'[(x+y)%3]}.tile.opentopomap.org/${z}/${x}/${y}.png`; return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`; }
+const TILES=new Map();
+function GMap(cv, opt){
+  const M={cv, opt, w:0,h:0,dpr:1,cx:0.5,cy:0.5,s:4096, ptr:new Map(), moving:false};
+  M.toX=x=>(x-M.cx)*M.s+M.w/2; M.toY=y=>(y-M.cy)*M.s+M.h/2;
+  M.resize=()=>{ const b=cv.getBoundingClientRect(); M.dpr=window.devicePixelRatio||1; M.w=b.width; M.h=b.height; cv.width=Math.round(M.w*M.dpr); cv.height=Math.round(M.h*M.dpr); };
+  M.fit=(P)=>{ if(!P.length) return false; let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; P.forEach(([x,y])=>{ x0=Math.min(x0,x); x1=Math.max(x1,x); y0=Math.min(y0,y); y1=Math.max(y1,y); });
+    M.cx=(x0+x1)/2; M.cy=(y0+y1)/2; const dx=Math.max(x1-x0,2e-6), dy=Math.max(y1-y0,2e-6); M.s=Math.min(256*Math.pow(2,18), Math.min((M.w-70)/dx,(M.h-70)/dy)); return true; };
+  M.zoomAt=(px,py,f,quick)=>{ const wx=M.cx+(px-M.w/2)/M.s, wy=M.cy+(py-M.h/2)/M.s; M.s=Math.max(512,Math.min(256*Math.pow(2,20),M.s*f)); M.cx=wx-(px-M.w/2)/M.s; M.cy=wy-(py-M.h/2)/M.s; M.draw(quick); };
+  M.mpp=()=>40075016.686*Math.cos(unmercLat(M.cy)*Math.PI/180)/M.s;
+  M.draw=(quick)=>{ const g=cv.getContext('2d'); g.setTransform(M.dpr,0,0,M.dpr,0,0); g.fillStyle='#eef0ea'; g.fillRect(0,0,M.w,M.h);
+    const base=opt.base();
+    if(base!=='none'){ const z=Math.max(0,Math.min(base==='topo'?17:19, Math.round(Math.log2(M.s/256)))), n=1<<z, ts=M.s/n;
+      const tx0=Math.floor((M.cx-M.w/2/M.s)*n), tx1=Math.floor((M.cx+M.w/2/M.s)*n), ty0=Math.max(0,Math.floor((M.cy-M.h/2/M.s)*n)), ty1=Math.min(n-1,Math.floor((M.cy+M.h/2/M.s)*n));
+      for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++){ const url=tileURL(base,z,tx,ty); let im=TILES.get(url);
+        if(!im){ im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>{ im.ok=true; clearTimeout(M.tt); M.tt=setTimeout(()=>M.draw(true),60); }; im.onerror=()=>{ im.bad=true; }; im.src=url; TILES.set(url,im); if(TILES.size>600) TILES.delete(TILES.keys().next().value); }
+        if(im.ok) g.drawImage(im, M.toX(tx/n), M.toY(ty/n), ts+0.5, ts+0.5); }
+      g.fillStyle='rgba(255,255,255,.15)'; g.fillRect(0,0,M.w,M.h);
+    }
+    opt.draw(g,M,quick);
+    // ölçek + kuzey
+    const mpp=M.mpp(), sm=[20,50,100,200,250,500,1000,2000,2500,5000,10000,20000,50000].find(v=>v/mpp>=70)||100000, sp=sm/mpp, W=M.w, H=M.h;
+    g.fillStyle='rgba(255,255,255,.9)'; g.fillRect(W-sp-34,H-34,sp+24,24); g.strokeStyle='#1d221e'; g.lineWidth=2; g.beginPath(); g.moveTo(W-sp-22,H-18); g.lineTo(W-22,H-18); g.moveTo(W-sp-22,H-23); g.lineTo(W-sp-22,H-13); g.moveTo(W-22,H-23); g.lineTo(W-22,H-13); g.stroke();
+    g.fillStyle='#1d221e'; g.font='600 11px system-ui,sans-serif'; g.textAlign='center'; g.fillText(sm>=1000?(sm/1000)+' km':sm+' m', W-22-sp/2, H-23);
+    g.beginPath(); g.moveTo(W-28,16); g.lineTo(W-20,36); g.lineTo(W-28,31); g.lineTo(W-36,36); g.closePath(); g.fill(); g.font='700 12px system-ui,sans-serif'; g.fillText(LG('K','N'), W-28, 50); g.textAlign='left';
+    if(base!=='none'){ g.fillStyle='rgba(255,255,255,.8)'; g.fillRect(W-210,H-50,200,13); g.fillStyle='#444'; g.font='9.5px system-ui,sans-serif'; g.fillText('© OpenStreetMap'+(base==='topo'?', OpenTopoMap (CC-BY-SA)':' contributors'), W-206, H-40); }
+  };
+  cv.onpointerdown=e=>{ cv.setPointerCapture(e.pointerId); M.ptr.set(e.pointerId,{x:e.offsetX,y:e.offsetY,x0:e.offsetX,y0:e.offsetY}); };
+  cv.onpointermove=e=>{ const p=M.ptr.get(e.pointerId); if(!p){ opt.hover&&opt.hover(e.offsetX,e.offsetY,M); return; }
+    if(M.ptr.size===1){ M.cx-=(e.offsetX-p.x)/M.s; M.cy-=(e.offsetY-p.y)/M.s; p.x=e.offsetX; p.y=e.offsetY; M.moving=true; M.draw(true); }
+    else if(M.ptr.size===2){ const [a,b]=[...M.ptr.values()]; const d0=Math.hypot(a.x-b.x,a.y-b.y); p.x=e.offsetX; p.y=e.offsetY; const d1=Math.hypot(a.x-b.x,a.y-b.y); if(d0>0) M.zoomAt((a.x+b.x)/2,(a.y+b.y)/2,d1/d0,true); } };
+  const up=e=>{ const p=M.ptr.get(e.pointerId); M.ptr.delete(e.pointerId); if(p && Math.hypot(e.offsetX-p.x0,e.offsetY-p.y0)<5 && !M.ptr.size) opt.tap&&opt.tap(e.offsetX,e.offsetY,M); if(!M.ptr.size && M.moving){ M.moving=false; M.draw(); } };
+  cv.onpointerup=up; cv.onpointercancel=up;
+  cv.onwheel=e=>{ e.preventDefault(); M.zoomAt(e.offsetX,e.offsetY,e.deltaY<0?1.25:0.8); };
+  return M;
+}
+
+/* ===================== PROJE HARİTASI ===================== */
+const IMGS=new Map(), imgMem=new Map();
+async function imgPut(id, blob){ try{ await phTx('readwrite', st=>st.put({id, blob}), 'gc'); }catch(e){ imgMem.set(id,blob); } }
+async function imgGet(id){ if(imgMem.has(id)) return imgMem.get(id); try{ const o=await phTx('readonly', st=>st.get(id), 'gc'); return o?o.blob:null; }catch(e){ return null; } }
+async function imgDel(id){ imgMem.delete(id); try{ await phTx('readwrite', st=>st.delete(id), 'gc'); }catch(e){} }
+let PM=null;
+function pmState(){ ui.pm=ui.pm||{lay:{s:true,o:true,m:true,d:true,g:false,k:true,lab:true}, base:'none', gel:null}; return ui.pm; }
+async function pmGcLoad(){
+  const key=DB.geochem.map(d=>d._u+':'+d.n).join(',');
+  if(ui.pm.gcKey===key) return; const rows=[], unit={}, els=[];
+  for(const d of DB.geochem.filter(d=>d.nxy>0)){ const R=await gcGet(d._u)||[]; d.els.forEach(e=>{ if(!(e.el in unit)){ unit[e.el]=e.unit; els.push(e.el); } }); const f={}; d.els.forEach(e=>{ f[e.el]=(UNIT_PPM[e.unit]||1)/(UNIT_PPM[unit[e.el]]||1); });
+    R.forEach(r=>{ if(r.lat==null) return; const v={}; for(const k in r.v) v[k]=r.v[k]*(f[k]||1); rows.push({id:r.id, lat:r.lat, lon:r.lon, v, ds:d.name}); }); }
+  ui.pm.gc={rows, unit, els}; ui.pm.gcKey=key;
+}
+async function pmImgLoad(L){ if(IMGS.has(L._u)) return IMGS.get(L._u); const blob=await imgGet('img_'+L._u); if(!blob) return null;
+  const im=new Image(); const u=URL.createObjectURL(blob); await new Promise(r=>{ im.onload=r; im.onerror=r; im.src=u; }); IMGS.set(L._u, im); return im; }
+function viewMap(){
+  const S=pmState(); DB.layers=DB.layers||[];
+  if(DB.geochem.length && ui.pm.gcKey!==DB.geochem.map(d=>d._u+':'+d.n).join(',')) pmGcLoad().then(()=>{ if(ui.view==='harita') PM&&PM.draw(); const sel=$('#pmGel'); if(sel&&ui.pm.gc){ sel.innerHTML=ui.pm.gc.els.map(e=>`<option ${e===S.gel?'selected':''}>${esc(e)}</option>`).join(''); } });
+  afterQueue.push(pmInit);
+  const L=S.lay, chk=(k,l,c)=>`<label class="chip ${L[k]?'on':''}" style="gap:6px"><input type="checkbox" data-on="pmLay" data-k="${k}" ${L[k]?'checked':''} style="width:15px;height:15px;min-height:0">${c?`<i class="dot" style="background:${c}"></i>`:''}${l}</label>`;
+  return `<div class="topbar"><h1>${LG('Proje haritası','Project map')}</h1>
+    <div class="row"><label class="btn ghost sm" style="cursor:pointer">${LG('+ KML / KMZ','+ KML / KMZ')}<input type="file" accept=".kml,.kmz,application/vnd.google-earth.kml+xml,application/vnd.google-earth.kmz" data-on="pmKml" hidden></label>
+    <button class="btn ghost sm" data-act="pmImgAdd">${LG('+ Görüntü altlık','+ Image overlay')}</button></div></div>
+  <div class="card" style="padding:10px 12px">
+    <div class="chips pmchips" style="margin:0">${chk('s',LG('Örnekler','Samples'),'#6b4c9a')}${chk('o',LG('Gözlemler','Observations'),'#e08a2c')}${chk('m',LG('Doğrultu/eğim','Strike/dip'),'#b03a2e')}${chk('d',LG('Sondaj','Drill holes'),'#2f7a4a')}${chk('k',LG('KML / altlık katmanları','KML / overlay layers'),'#555')}${chk('g',LG('Jeokimya','Geochemistry'),'#e4572e')}${chk('lab',LG('Etiketler','Labels'))}</div>
+    <div class="row" style="margin-top:8px;align-items:flex-end">
+      <label class="fld" style="max-width:120px" ${L.g?'':'hidden'}><span>Element</span><select id="pmGel" data-on="pmGel">${(ui.pm.gc?ui.pm.gc.els:[]).map(e=>`<option ${e===S.gel?'selected':''}>${esc(e)}</option>`).join('')}</select></label>
+      <label class="fld" style="max-width:200px"><span>${LG('Altlık','Basemap')}</span><select data-on="pmBase"><option value="none" ${S.base==='none'?'selected':''}>${LG('Yok','None')}</option><option value="osm" ${S.base==='osm'?'selected':''}>OpenStreetMap</option><option value="topo" ${S.base==='topo'?'selected':''}>OpenTopoMap</option></select></label>
+      <div class="row" style="margin-left:auto"><button class="btn ghost sm" data-act="pmZoom" data-z="1.6">＋</button><button class="btn ghost sm" data-act="pmZoom" data-z="0.625">－</button><button class="btn ghost sm" data-act="pmFit">⤢</button><button class="btn ghost sm" data-act="pmLocate">${gpsIcon()}</button><button class="btn sm" data-act="pmPng">PNG</button></div>
+    </div>
+    ${DB.layers.length?`<div class="chips" style="margin:8px 0 0">${DB.layers.map(l=>`<span class="chip ${l.vis!==false?'on':''}" data-act="pmLyr" data-u="${l._u}">${l.kind==='image'?'🖼':'📐'} ${esc(l.name)}${l.kind==='image'?` <input type="range" min="0.1" max="1" step="0.1" value="${l.op||0.7}" data-on="pmOp" data-u="${l._u}" style="width:70px;min-height:0;padding:0">`:''}<button class="gcx" data-act="pmLyrDel" data-u="${l._u}" title="${LG('Sil','Delete')}">✕</button></span>`).join('')}</div>`:''}
+  </div>
+  <div id="pmBox" style="position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#eef0ea;touch-action:none">
+    <canvas id="pmCanvas" style="display:block;width:100%;height:calc(100vh - 300px);min-height:420px;cursor:grab"></canvas>
+    <div id="pmTip" style="position:absolute;display:none;background:#1d221e;color:#fff;font-size:12.5px;padding:8px 10px;border-radius:8px;z-index:3;max-width:260px"></div>
+    <div id="pmXY" style="position:absolute;left:8px;bottom:8px;background:rgba(255,255,255,.88);font-size:11px;padding:3px 7px;border-radius:5px;pointer-events:none"></div>
+  </div>
+  <p class="muted small">${LG('Altlık haritalar internet gerektirir; internetle bakılan alanlar cihazda saklanır ve sonra çevrimdışı da görünür. Tamamen çevrimdışı altlık için QGIS veya Google Earth’ten aldığınız bir görüntüyü (jeoloji haritası, uydu görüntüsü) “+ Görüntü altlık” ile ya da KMZ olarak ekleyin.','Basemaps need internet; areas viewed online are kept on the device and later shown offline. For a fully offline basemap add an image from QGIS or Google Earth (geological map, satellite image) via “+ Image overlay” or as a KMZ.')}</p>`;
+}
+function pmFeatures(){
+  const S=ui.pm, F=[];
+  const ok=r=>num(r.lat)!=null&&num(r.lon)!=null;
+  const gIds=(S.lay.g&&S.gc)?new Set(S.gc.rows.filter(r=>S.gel&&r.v[S.gel]!=null).map(r=>String(r.id).toLowerCase())):null;
+  if(S.lay.s) DB.samples.filter(ok).filter(r=>!gIds||!gIds.has(String(r.id).toLowerCase())).forEach(r=>{ const [x,y]=merc(+r.lat,+r.lon); F.push({k:'s',x,y,id:r.id,col:TYPES[r.type]?.hex||'#666',ref:r, txt:`${TYPES[r.type]?LG(TYPES[r.type].ad,T(TYPES[r.type].ad)):''}${summaryOf(r)?' · '+summaryOf(r):''}`}); });
+  if(S.lay.o) DB.obs.filter(ok).forEach(r=>{ const [x,y]=merc(+r.lat,+r.lon); F.push({k:'o',x,y,id:r.id,ref:r,txt:r.baslik||r.tip||''}); });
+  if(S.lay.m) DB.meas.forEach(m=>{ let lat=m.lat, lon=m.lon; if(!(num(lat)!=null&&num(lon)!=null)){ const o=DB.obs.find(x=>x.id===m.obs||x.id===m.sample)||DB.samples.find(x=>x.id===m.sample); if(o){ lat=o.lat; lon=o.lon; } } if(num(lat)==null||num(lon)==null) return; const [x,y]=merc(+lat,+lon); F.push({k:'m',x,y,id:`${m.kind} ${Math.round(m.dip)}/${pad3(m.dd)}`,ref:m,txt:m.line||''}); });
+  if(S.lay.d) DB.holes.filter(ok).forEach(h=>{ const [x,y]=merc(+h.lat,+h.lon); const L=+h.eoh||+h.plan||0, dip=Math.abs(+h.dip||90), az=+h.azi||0, Hm=L*Math.cos(dip*Math.PI/180), wpm=1/(40075016.686*Math.cos(+h.lat*Math.PI/180));
+    F.push({k:'d',x,y,id:h.id,ref:h,x2:x+Hm*Math.sin(az*Math.PI/180)*wpm, y2:y-Hm*Math.cos(az*Math.PI/180)*wpm, txt:`Az ${h.azi??'—'}° / ${h.dip??'—'}° · EOH ${h.eoh||'—'} m`}); });
+  if(S.lay.g && S.gc && S.gel){ const vals=S.gc.rows.map(r=>r.v[S.gel]).filter(v=>v>0).sort((a,b)=>a-b); const br=GC_PCT.map(p=>pctl(vals,p)); S.gbr=br;
+    S.gc.rows.filter(r=>r.v[S.gel]!=null).forEach(r=>{ const [x,y]=merc(r.lat,r.lon); const v=r.v[S.gel]; let c=0; while(c<5&&v>br[c]) c++; F.push({k:'g',x,y,id:r.id,c,v,txt:`${S.gel}: ${fmtv(v)} ${S.gc.unit[S.gel]} · ${r.ds}`}); }); F.sort((a,b)=>(a.k==='g'&&b.k==='g')?a.c-b.c:0); }
+  return F;
+}
+function pmInit(){
+  const cv=$('#pmCanvas'); if(!cv) return;
+  PM=GMap(cv,{base:()=>ui.pm.base, draw:pmDraw, tap:pmTap, hover:(x,y,M)=>{ const e=$('#pmXY'); if(!e) return; const wx=M.cx+(x-M.w/2)/M.s, wy=M.cy+(y-M.h/2)/M.s, lat=unmercLat(wy), lon=wx*360-180, u=toUTM(lat,lon); e.textContent=`${lat.toFixed(5)}, ${lon.toFixed(5)} · UTM ${u.zone}${u.hem} ${Math.round(u.E)} / ${Math.round(u.N)}`; }});
+  PM.resize();
+  if(ui.pm.view){ Object.assign(PM, ui.pm.view); } else pmFitAll();
+  Promise.all((DB.layers||[]).filter(l=>l.kind==='image').map(pmImgLoad)).then(()=>PM&&PM.draw());
+  PM.draw();
+}
+function pmFitAll(){
+  if(!PM) return; const F=pmFeatures(), P=F.map(f=>[f.x,f.y]);
+  (DB.layers||[]).forEach(l=>{ if(l.kind==='image'&&l.b){ P.push(merc(l.b.n,l.b.w), merc(l.b.s,l.b.e)); } (l.feats||[]).forEach(f=>f.c.forEach(c=>P.push(merc(c[1],c[0])))); });
+  if(!PM.fit(P)){ const c=DB.samples.find(s=>s.lat)||DB.obs.find(s=>s.lat); if(c){ const [x,y]=merc(+c.lat,+c.lon); PM.cx=x; PM.cy=y; PM.s=256*Math.pow(2,14); } }
+}
+function pmDraw(g,M,quick){
+  const S=ui.pm, X=M.toX, Y=M.toY; ui.pm.view={cx:M.cx,cy:M.cy,s:M.s};
+  if(S.lay.k) (DB.layers||[]).filter(l=>l.vis!==false).forEach(l=>{
+    if(l.kind==='image' && l.b){ const im=IMGS.get(l._u); if(im&&im.naturalWidth){ const [x0,y0]=merc(l.b.n,l.b.w), [x1,y1]=merc(l.b.s,l.b.e); g.globalAlpha=+l.op||0.7; g.drawImage(im, X(x0), Y(y0), X(x1)-X(x0), Y(y1)-Y(y0)); g.globalAlpha=1; } }
+    (l.feats||[]).forEach(f=>{ const pts=f.c.map(c=>merc(c[1],c[0])); if(!pts.length) return;
+      if(f.t==='pt'){ g.beginPath(); g.arc(X(pts[0][0]),Y(pts[0][1]),4,0,7); g.fillStyle='#555'; g.fill(); if(S.lay.lab&&f.name){ g.font='11px system-ui'; g.fillStyle='#333'; g.fillText(f.name, X(pts[0][0])+6, Y(pts[0][1])+4); } return; }
+      g.beginPath(); pts.forEach((p,i)=>i?g.lineTo(X(p[0]),Y(p[1])):g.moveTo(X(p[0]),Y(p[1]))); if(f.t==='poly') g.closePath();
+      g.strokeStyle='#c0392b'; g.lineWidth=2.2; g.setLineDash(f.t==='poly'?[8,5]:[]); g.stroke(); g.setLineDash([]); if(f.t==='poly'){ g.fillStyle='rgba(192,57,43,.06)'; g.fill(); }
+      if(S.lay.lab && f.name){ const cx=pts.reduce((s,p)=>s+p[0],0)/pts.length, cy=pts.reduce((s,p)=>s+p[1],0)/pts.length; g.font='700 12px system-ui'; g.lineWidth=3; g.strokeStyle='rgba(255,255,255,.9)'; g.strokeText(f.name,X(cx),Y(cy)); g.fillStyle='#8e2a1e'; g.fillText(f.name,X(cx),Y(cy)); } });
+  });
+  const F=pmFeatures(); ui.pm.F=F;
+  const LBL=[];
+  F.forEach(f=>{ const x=X(f.x), y=Y(f.y); if(x<-60||y<-60||x>M.w+60||y>M.h+60) return;
+    if(f.k==='g'){ g.beginPath(); g.arc(x,y,GC_RAD[f.c],0,7); g.fillStyle=GC_PAL[f.c]; g.globalAlpha=.9; g.fill(); g.globalAlpha=1; g.lineWidth=.7; g.strokeStyle='rgba(30,30,30,.7)'; g.stroke(); return; }
+    if(f.k==='d'){ g.strokeStyle='#2f7a4a'; g.lineWidth=2; g.setLineDash([6,4]); g.beginPath(); g.moveTo(x,y); g.lineTo(X(f.x2),Y(f.y2)); g.stroke(); g.setLineDash([]);
+      g.beginPath(); g.arc(x,y,6,0,7); g.fillStyle='#fff'; g.fill(); g.lineWidth=2.2; g.strokeStyle='#2f7a4a'; g.stroke(); g.beginPath(); g.moveTo(x-9,y); g.lineTo(x+9,y); g.moveTo(x,y-9); g.lineTo(x,y+9); g.lineWidth=1.4; g.stroke(); }
+    else if(f.k==='s'){ g.beginPath(); g.arc(x,y,5.5,0,7); g.fillStyle=f.col; g.fill(); g.lineWidth=1.2; g.strokeStyle='#fff'; g.stroke(); }
+    else if(f.k==='o'){ g.beginPath(); g.moveTo(x,y-7); g.lineTo(x+6,y); g.lineTo(x,y+7); g.lineTo(x-6,y); g.closePath(); g.fillStyle='#e08a2c'; g.fill(); g.lineWidth=1.2; g.strokeStyle='#fff'; g.stroke(); }
+    else if(f.k==='m'){ const m=f.ref, st=(+m.strike)*Math.PI/180, dd=(+m.dd)*Math.PI/180, c=KINDS[m.kind]||'#333', L=13;
+      g.strokeStyle=c; g.lineWidth=2.4; g.beginPath(); g.moveTo(x-Math.sin(st)*L, y+Math.cos(st)*L); g.lineTo(x+Math.sin(st)*L, y-Math.cos(st)*L); g.stroke();
+      g.lineWidth=2; g.beginPath(); g.moveTo(x,y); g.lineTo(x+Math.sin(dd)*7, y-Math.cos(dd)*7); g.stroke();
+      g.font='700 10.5px system-ui'; g.lineWidth=3; g.strokeStyle='rgba(255,255,255,.9)'; const tx=x+Math.sin(dd)*14, ty=y-Math.cos(dd)*14+4; g.strokeText(Math.round(m.dip),tx-5,ty); g.fillStyle=c; g.fillText(Math.round(m.dip),tx-5,ty); }
+    if(S.lay.lab && f.k!=='m') LBL.push({f,x,y});
+    if(ui.pm.sel===f){ g.beginPath(); g.arc(x,y,11,0,7); g.lineWidth=2.5; g.strokeStyle='#000'; g.stroke(); }
+  });
+  // etiketler: çakışanlar atlanır (öncelik: sondaj > gözlem > örnek > jeokimya)
+  const pr={d:0,o:1,s:2,g:3}, boxes=[]; LBL.sort((a,b)=>pr[a.f.k]-pr[b.f.k]);
+  LBL.forEach(({f,x,y})=>{ g.font=f.k==='d'?'700 11.5px system-ui':'600 10.5px system-ui'; const w=g.measureText(f.id).width, bx={x0:x+7,y0:y-17,x1:x+9+w,y1:y-3};
+    if(bx.x1<0||bx.x0>M.w||bx.y1<0||bx.y0>M.h) return; if(boxes.some(b=>!(bx.x1<b.x0||bx.x0>b.x1||bx.y1<b.y0||bx.y0>b.y1))) return; boxes.push(bx);
+    g.lineWidth=3; g.strokeStyle='rgba(255,255,255,.9)'; g.strokeText(f.id,x+8,y-6); g.fillStyle=f.k==='d'?'#1f5a33':'#1d221e'; g.fillText(f.id,x+8,y-6); });
+  if(ui.pm.me){ const [x,y]=merc(ui.pm.me.lat,ui.pm.me.lon); g.beginPath(); g.arc(X(x),Y(y),7,0,7); g.fillStyle='#1a73e8'; g.fill(); g.lineWidth=3; g.strokeStyle='#fff'; g.stroke(); }
+  // lejant
+  const items=[]; if(S.lay.s) Object.entries(TYPES).forEach(([k,t])=>{ if(F.some(f=>f.k==='s'&&f.ref.type===k)) items.push(['c',t.hex,LG(t.kisa,T(t.kisa))]); });
+  if(S.lay.o&&F.some(f=>f.k==='o')) items.push(['o','#e08a2c',LG('Saha gözlemi','Field observation')]);
+  if(S.lay.m&&F.some(f=>f.k==='m')) items.push(['m','#b03a2e',LG('Doğrultu / eğim','Strike / dip')]);
+  if(S.lay.d&&F.some(f=>f.k==='d')) items.push(['d','#2f7a4a',LG('Sondaj (kuyu izi)','Drill hole (trace)')]);
+  const gl=S.lay.g&&S.gbr&&F.some(f=>f.k==='g'); const lh=items.length*18+(gl?6*17+22:0)+12; if(lh>12){
+    g.fillStyle='rgba(255,255,255,.92)'; g.strokeStyle='#bbb'; g.lineWidth=1; g.beginPath(); g.roundRect?g.roundRect(10,10,190,lh,8):g.rect(10,10,190,lh); g.fill(); g.stroke();
+    let yy=26; g.font='11.5px system-ui'; items.forEach(([t,c,l])=>{ g.fillStyle=c; if(t==='c'){ g.beginPath(); g.arc(24,yy-4,5,0,7); g.fill(); } else if(t==='o'){ g.beginPath(); g.moveTo(24,yy-10); g.lineTo(29,yy-4); g.lineTo(24,yy+2); g.lineTo(19,yy-4); g.fill(); } else { g.fillRect(17,yy-6,14,3); }
+      g.fillStyle='#1d221e'; g.fillText(l,36,yy); yy+=18; });
+    if(gl){ const br=S.gbr, u=S.gc.unit[S.gel]; g.font='700 11.5px system-ui'; g.fillText(`${S.gel} (${u})`,18,yy+2); yy+=18; const labs=[`≤ ${fmtv(br[0])}`,`${fmtv(br[0])}–${fmtv(br[1])}`,`${fmtv(br[1])}–${fmtv(br[2])}`,`${fmtv(br[2])}–${fmtv(br[3])}`,`${fmtv(br[3])}–${fmtv(br[4])}`,`> ${fmtv(br[4])}`];
+      labs.forEach((l,i)=>{ g.beginPath(); g.arc(25,yy-4,Math.min(GC_RAD[i],7),0,7); g.fillStyle=GC_PAL[i]; g.fill(); g.fillStyle='#1d221e'; g.font='11px system-ui'; g.fillText(l,38,yy); yy+=17; }); }
+  }
+}
+function pmTap(px,py,M){
+  const tip=$('#pmTip'); let best=null, bd=16;
+  (ui.pm.F||[]).forEach(f=>{ const d=Math.hypot(M.toX(f.x)-px, M.toY(f.y)-py); if(d<bd){ bd=d; best=f; } });
+  ui.pm.sel=best; M.draw(true); if(!tip) return;
+  if(!best){ tip.style.display='none'; return; }
+  const kn={s:LG('Örnek','Sample'),o:LG('Saha gözlemi','Field observation'),m:LG('Ölçüm','Measurement'),d:LG('Sondaj','Drill hole'),g:LG('Jeokimya','Geochemistry')}[best.k];
+  tip.innerHTML=`<div style="opacity:.7;font-size:11px">${kn}</div><b>${esc(best.id)}</b>${best.txt?`<div style="margin-top:3px">${esc(String(best.txt).slice(0,160))}</div>`:''}${['s','o','d'].includes(best.k)?`<button class="btn sm acc" data-act="pmOpen" style="margin-top:8px;min-height:30px">${LG('Kaydı aç','Open record')}</button>`:''}`;
+  tip.style.display='block'; tip.style.left=Math.max(4,Math.min(M.w-270, px+12))+'px'; tip.style.top=Math.max(4,Math.min(M.h-140, py-20))+'px';
+}
+/* KML / KMZ */
+function parseKML(text){
+  const doc=new DOMParser().parseFromString(text,'text/xml'), feats=[], gos=[];
+  const C=s=>String(s||'').trim().split(/\s+/).map(t=>t.split(',').map(Number)).filter(c=>c.length>=2&&!isNaN(c[0])&&!isNaN(c[1])).map(c=>[c[0],c[1]]);
+  const T1=(el,tag)=>{ const x=el.getElementsByTagName(tag)[0]; return x?x.textContent:''; };
+  [...doc.getElementsByTagName('Placemark')].forEach(pm=>{ const name=T1(pm,'name');
+    [...pm.getElementsByTagName('Polygon')].forEach(pg=>{ const ob=pg.getElementsByTagName('outerBoundaryIs')[0]||pg; feats.push({t:'poly',name,c:C(T1(ob,'coordinates'))}); });
+    [...pm.getElementsByTagName('LineString')].forEach(l=>feats.push({t:'line',name,c:C(T1(l,'coordinates'))}));
+    [...pm.getElementsByTagName('Point')].forEach(p=>feats.push({t:'pt',name,c:C(T1(p,'coordinates'))})); });
+  [...doc.getElementsByTagName('GroundOverlay')].forEach(go=>{ const b=go.getElementsByTagName('LatLonBox')[0]; if(!b) return; gos.push({name:T1(go,'name'), href:T1(go,'href'), b:{n:+T1(b,'north'), s:+T1(b,'south'), e:+T1(b,'east'), w:+T1(b,'west')}}); });
+  return {feats:feats.filter(f=>f.c.length), gos};
+}
+async function unzipBuf(buf){
+  const dv=new DataView(buf); let e=buf.byteLength-22; while(e>=0 && dv.getUint32(e,true)!==0x06054b50) e--; if(e<0) throw new Error('zip');
+  const cnt=dv.getUint16(e+10,true), off=dv.getUint32(e+16,true), files={}; let p=off;
+  for(let i=0;i<cnt;i++){ const method=dv.getUint16(p+10,true), csize=dv.getUint32(p+20,true), nl=dv.getUint16(p+28,true), xl=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), lho=dv.getUint32(p+42,true);
+    files[new TextDecoder().decode(new Uint8Array(buf,p+46,nl))]={method,csize,lho}; p+=46+nl+xl+cl; }
+  const get=async n=>{ const f=files[n]; if(!f) return null; const ln=dv.getUint16(f.lho+26,true), lx=dv.getUint16(f.lho+28,true), d=new Uint8Array(buf,f.lho+30+ln+lx,f.csize);
+    if(f.method===0) return d; const out=await new Response(new Blob([d]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer(); return new Uint8Array(out); };
+  return {names:Object.keys(files), get};
+}
+async function pmImportKml(file){
+  try{
+    let text, zip=null;
+    if(/\.kmz$/i.test(file.name)){ zip=await unzipBuf(await file.arrayBuffer()); const k=zip.names.find(n=>/\.kml$/i.test(n)); if(!k) throw 0; text=new TextDecoder().decode(await zip.get(k)); }
+    else text=await file.text();
+    const {feats,gos}=parseKML(text); DB.layers=DB.layers||[]; let n=0;
+    if(feats.length){ DB.layers.push({_u:uid(), kind:'vector', name:file.name.replace(/\.(kml|kmz)$/i,''), feats, vis:true}); n++; }
+    for(const go of gos){ if(!zip||!go.href) continue; const bytes=await zip.get(go.href)||await zip.get(go.href.replace(/^\.\//,'')); if(!bytes) continue;
+      const ext=(go.href.split('.').pop()||'png').toLowerCase(), blob=new Blob([bytes],{type:ext==='jpg'||ext==='jpeg'?'image/jpeg':'image/png'}), u=uid();
+      await imgPut('img_'+u, blob);
+      DB.layers.push({_u:u, kind:'image', name:go.name||file.name, b:go.b, op:0.7, vis:true}); n++; }
+    if(!n){ toast(LG('Dosyada çizilebilir öğe bulunamadı','No drawable features found in the file'),'warn'); return; }
+    persist(); toast(LG(`${n} katman eklendi`,`${n} layer(s) added`)); ui.pm.view=null; ui.pm.lay.k=true; render();
+  }catch(e){ toast(LG('KML/KMZ okunamadı','Could not read KML/KMZ'),'err'); }
+}
+function pmImgModal(){
+  const z=(DB.samples.find(s=>s.zone)||{}).zone||DB.settings.zone, hem=(DB.samples.find(s=>s.hem)||{}).hem||'N';
+  const m=modal(`<h2 style="margin-top:0">${LG('Görüntü altlık ekle','Add image overlay')}</h2>
+    <p class="muted small" style="margin-top:-6px">${LG('Jeoloji haritası, uydu görüntüsü ya da QGIS’ten aldığınız bir harita görüntüsü (PNG/JPG). Görüntünün kenarlarının koordinatlarını girin (kuzey yukarıda, döndürülmemiş).','A geological map, satellite image or map image exported from QGIS (PNG/JPG). Enter the coordinates of the image edges (north up, not rotated).')}</p>
+    <label class="fld"><span>${LG('Görüntü','Image')}</span><input type="file" id="im_f" accept="image/*"></label>
+    <div class="grid" style="margin-top:10px">
+      <label class="fld"><span>${LG('Ad','Name')}</span><input id="im_n" placeholder="${LG('ör. MTA 1/25.000 jeoloji','e.g. 1:25,000 geology')}"></label>
+      <label class="fld"><span>${LG('Koordinat sistemi','Coordinate system')}</span><select id="im_cs"><option value="utm">UTM (WGS84)</option>${DB.settings.showArc?'<option value="arc">UTM (Arc 1950)</option>':''}<option value="ll">${LG('Enlem / boylam','Lat / long')}</option></select></label>
+      <label class="fld"><span>${LG('UTM zon','UTM zone')}</span><input id="im_z" type="number" value="${esc(z)}"></label>
+      <label class="fld"><span>${LG('Yarıküre','Hemisphere')}</span><select id="im_h"><option value="N" ${hem!=='S'?'selected':''}>N</option><option value="S" ${hem==='S'?'selected':''}>S</option></select></label>
+      <label class="fld"><span>${LG('Sol (batı) – E veya boylam','Left (west) – E or lon')}</span><input id="im_w" type="number" step="any"></label>
+      <label class="fld"><span>${LG('Sağ (doğu) – E veya boylam','Right (east) – E or lon')}</span><input id="im_e" type="number" step="any"></label>
+      <label class="fld"><span>${LG('Alt (güney) – N veya enlem','Bottom (south) – N or lat')}</span><input id="im_s" type="number" step="any"></label>
+      <label class="fld"><span>${LG('Üst (kuzey) – N veya enlem','Top (north) – N or lat')}</span><input id="im_t" type="number" step="any"></label>
+    </div>
+    <div class="row end" style="margin-top:14px"><button class="btn ghost" data-m="0">${LG('Vazgeç','Cancel')}</button><button class="btn acc" data-m="1">${LG('Ekle','Add')}</button></div>`);
+  m.onclick=async e=>{ const b=e.target.closest('[data-m]'); if(!b) return; if(b.dataset.m==='0'){ closeModal(); return; }
+    const f=$('#im_f').files[0], cs=$('#im_cs').value, W=num($('#im_w').value), E=num($('#im_e').value), Sv=num($('#im_s').value), N=num($('#im_t').value);
+    if(!f||W==null||E==null||Sv==null||N==null){ toast(LG('Görüntüyü ve dört kenar koordinatını girin','Choose the image and enter all four edge coordinates'),'err'); return; }
+    let bb;
+    if(cs==='ll') bb={n:N,s:Sv,e:E,w:W};
+    else { const z=+$('#im_z').value, south=$('#im_h').value==='S', cv=(x,y)=>{ if(cs==='arc'){ const a=fromUTM(z,x,y,south,ELL.ARC); return arcToWgs(a.lat,a.lon); } return fromUTM(z,x,y,south); };
+      const nw=cv(W,N), se=cv(E,Sv); bb={n:nw.lat,w:nw.lon,s:se.lat,e:se.lon}; }
+    const u=uid(); await imgPut('img_'+u, f);
+    DB.layers=DB.layers||[]; DB.layers.push({_u:u, kind:'image', name:$('#im_n').value.trim()||f.name, b:bb, op:0.7, vis:true}); persist(); closeModal(); ui.pm.view=null; ui.pm.lay.k=true; toast(LG('Görüntü altlık eklendi','Image overlay added')); render(); };
+}
+
+/* ===================== CRM KÜTÜPHANESİ ===================== */
+function crmGroups(){ const G=new Map(); crmList().slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),'tr',{numeric:true})).forEach(c=>{ if(!G.has(c.name)) G.set(c.name,[]); G.get(c.name).push(c); }); return G; }
+function crmCard(){
+  const G=crmGroups(), used=new Set([...DB.holes.flatMap(h=>(h.qc||[]).filter(q=>qcKind(q.tip)==='std').map(q=>q.ref)), ...DB.samples.filter(s=>s.type==='QC'&&/Standart/i.test(s.qctip||'')).map(s=>s.crm)].filter(Boolean));
+  const unknown=[...used].filter(n=>!G.has(n));
+  return `<div class="card"><div class="row" style="justify-content:space-between"><h2 style="margin:0">${LG('Projedeki standartlar (CRM)','Project standards (CRM)')}</h2>
+    <div class="row"><button class="btn ghost sm" data-act="goQaqc">${LG('QA/QC grafikleri →','QA/QC charts →')}</button><button class="btn acc sm" data-act="crmEdit">${LG('+ Standart ekle','+ Add standard')}</button></div></div>
+    ${G.size?`<div class="tblwrap" style="margin-top:10px"><table class="cards"><thead><tr><th>${LG('Standart','Standard')}</th><th>${LG('Sertifika değerleri','Certified values')}</th><th>${LG('Kullanım','Used')}</th><th></th></tr></thead><tbody>
+      ${[...G].map(([n,L])=>{ const k=DB.holes.reduce((s,h)=>s+(h.qc||[]).filter(q=>q.ref===n).length,0)+DB.samples.filter(s=>s.type==='QC'&&s.crm===n).length;
+        return `<tr><td data-l="${LG('Standart','Standard')}"><b>${esc(n)}</b>${L[0].note?`<div class="muted small">${esc(L[0].note)}</div>`:''}</td><td data-l="${LG('Değerler','Values')}">${L.map(c=>`<span class="pill" style="margin:2px 4px 2px 0">${esc(c.el)} ${fmtv(+c.mean)} ± ${fmtv(+c.sd)} ${esc(c.unit)}</span>`).join('')}</td><td data-l="${LG('Kullanım','Used')}">${k}</td>
+        <td class="del nolabel" style="white-space:nowrap"><button data-act="crmEdit" data-n="${esc(n)}" title="${LG('Düzenle','Edit')}">✎</button><button data-act="crmRemove" data-n="${esc(n)}" title="${LG('Sil','Delete')}">✕</button></td></tr>`; }).join('')}
+      </tbody></table></div>`:`<p class="muted small" style="margin:8px 0 0">${LG('Henüz standart eklenmemiş. Projede kullandığınız standartları sertifika değerleriyle (element, ortalama, SD) bir kez ekleyin; QC kaydı girerken listeden seçersiniz ve QA/QC grafikleri bu değerlerle çizilir.','No standards yet. Add the standards used in this project once with their certified values (element, mean, SD); you then pick them when entering QC records and the QA/QC charts use these values.')}</p>`}
+    ${unknown.length?`<div class="warns">⚠ ${LG('Sertifika değeri girilmemiş standart adları','Standard names without certified values')}: ${unknown.map(n=>`<a href="#" data-act="crmEdit" data-n="${esc(n)}" data-new="1"><b>${esc(n)}</b></a>`).join(', ')}</div>`:''}
+  </div>`;
+}
+function crmModal(name, isNew){
+  const L=name&&!isNew?crmGroups().get(name)||[]:[], rows=L.length?L:[{el:'Au',unit:'ppm',mean:'',sd:''}];
+  const els=[...new Set(['Au','Ag','Cu','Pb','Zn','As','Mo','Ni','Co','Sb','Bi','Fe','S', ...((assayIdx&&assayIdx.els)||[])])];
+  const row=r=>`<div class="row crmrow" style="align-items:flex-end;gap:8px;margin-top:6px">
+    <label class="fld" style="max-width:110px"><span>Element</span><input name="el" list="crm_els" value="${esc(r.el||'')}"></label>
+    <label class="fld" style="max-width:100px"><span>${LG('Birim','Unit')}</span><select name="unit">${['ppm','g/t','ppb','%'].map(u=>`<option ${u===r.unit?'selected':''}>${u}</option>`).join('')}</select></label>
+    <label class="fld" style="max-width:130px"><span>${LG('Ortalama','Mean')}</span><input name="mean" type="number" step="any" value="${esc(r.mean??'')}"></label>
+    <label class="fld" style="max-width:120px"><span>SD</span><input name="sd" type="number" step="any" value="${esc(r.sd??'')}"></label>
+    <button type="button" class="btn ghost sm" data-m="rm" title="${LG('Satırı sil','Remove row')}">✕</button></div>`;
+  const m=modal(`<h2 style="margin-top:0">${name&&!isNew?LG('Standardı düzenle','Edit standard'):LG('Standart ekle','Add standard')}</h2>
+    <div class="grid"><label class="fld"><span>${LG('Standart adı','Standard name')}</span><input id="crm_n" value="${esc(name||'')}" placeholder="${LG('ör. OREAS 229','e.g. OREAS 229')}"></label>
+    <label class="fld"><span>${LG('Not (tedarikçi, parti vb.)','Note (supplier, lot etc.)')}</span><input id="crm_note" value="${esc((L[0]||{}).note||'')}"></label></div>
+    <h3 style="margin:14px 0 2px">${LG('Sertifika değerleri','Certified values')}</h3><p class="muted small" style="margin:0">${LG('Sertifikadaki ortalama ve 1 SD değerini girin. Birden fazla element eklenebilir.','Enter the certified mean and 1 SD. Several elements can be added.')}</p>
+    <div id="crm_rows">${rows.map(row).join('')}</div><datalist id="crm_els">${els.map(e=>`<option value="${esc(e)}">`).join('')}</datalist>
+    <button type="button" class="btn ghost sm" data-m="add" style="margin-top:8px">${LG('+ Element ekle','+ Add element')}</button>
+    <div class="row end" style="margin-top:16px"><button class="btn ghost" data-m="0">${LG('Vazgeç','Cancel')}</button><button class="btn acc" data-m="1">${LG('Kaydet','Save')}</button></div>`);
+  m.onclick=e=>{ const b=e.target.closest('[data-m]'); if(!b) return;
+    if(b.dataset.m==='0'){ closeModal(); return; }
+    if(b.dataset.m==='add'){ $('#crm_rows').insertAdjacentHTML('beforeend', row({el:'',unit:'ppm'})); return; }
+    if(b.dataset.m==='rm'){ b.closest('.crmrow').remove(); return; }
+    const n=$('#crm_n').value.trim(), note=$('#crm_note').value.trim();
+    if(!n){ toast(LG('Standart adını yazın','Enter the standard name'),'err'); return; }
+    if(n!==name && crmGroups().has(n)){ toast(LG('Bu adla bir standart zaten var','A standard with this name already exists'),'err'); return; }
+    const R=[...document.querySelectorAll('#crm_rows .crmrow')].map(d=>({name:n, note, el:d.querySelector('[name=el]').value.trim(), unit:d.querySelector('[name=unit]').value, mean:num(d.querySelector('[name=mean]').value), sd:num(d.querySelector('[name=sd]').value)}));
+    const bad=R.find(r=>!r.el||r.mean==null||!r.sd); if(bad||!R.length){ toast(LG('Her satırda element, ortalama ve SD dolu olmalı','Each row needs element, mean and SD'),'err'); return; }
+    if(new Set(R.map(r=>r.el)).size<R.length){ toast(LG('Aynı element iki kez girilmiş','An element is entered twice'),'err'); return; }
+    DB.settings.crms=crmList().filter(c=>c.name!==(isNew?n:name||n)).concat(R);
+    if(name && !isNew && name!==n){ DB.holes.forEach(h=>(h.qc||[]).forEach(q=>{ if(q.ref===name) q.ref=n; })); DB.samples.forEach(s=>{ if(s.crm===name) s.crm=n; }); }
+    persist(); closeModal(); toast(LG('Standart kaydedildi','Standard saved')); render(); };
+}
+
 /* ---------- AKTAR / AYARLAR ---------- */
 function viewExport(){
   const s=DB.settings;
@@ -2642,6 +3123,8 @@ function viewExport(){
         <button class="btn" data-act="exp" data-x="lith">lithology.csv</button>
         <button class="btn" data-act="exp" data-x="dsamp">samples.csv <span style="font-weight:400;opacity:.8">(numune + QC, sıralı)</span></button>
         <button class="btn" data-act="exp" data-x="qaqc">qaqc.csv</button>
+        <button class="btn" data-act="exp" data-x="assay">assay.csv</button>
+        <button class="btn" data-act="exp" data-x="icpt">intercepts.csv</button>
       </div>
     </div>
     <div class="card"><h2>Yedek</h2>
@@ -2732,6 +3215,7 @@ async function backupJSON(){
   const out=JSON.parse(JSON.stringify(DB)); out.project={...(curMeta()||{})}; delete out.project.id; delete out.project.stats;
   if(withPh){ out.photoData={}; let n=0; for(const id of photoRefs(true)){ const o=await phGet(id); if(o){ out.photoData[id]=await blobToDataURL(o.full); n++; } } toast(`${n} fotoğraf yedeğe eklendi`); }
   if(DB.geochem.length){ out.gcData={}; for(const d of DB.geochem){ const r=await gcGet(d._u); if(r) out.gcData[d._u]=r; } }
+  if((DB.layers||[]).some(l=>l.kind==='image')){ out.imgData={}; for(const l of DB.layers.filter(l=>l.kind==='image')){ const b=await imgGet('img_'+l._u); if(b) out.imgData['img_'+l._u]=await blobToDataURL(b); } }
   await saveFile(`${DB.settings.prj}_geoloot_yedek_${stamp()}${withPh?'_fotolu':''}.json`, JSON.stringify(out));
 }
 let dlNS=null, dlTried=false;
@@ -2828,6 +3312,22 @@ function demo(){
 
 /* ---------- olaylar ---------- */
 const ACT = {
+  goQaqc:()=>{ gcDefaults(); ui.gx.tab='qaqc'; go('jeokimya'); },
+  crmEdit:(el)=>crmModal(el.dataset.n||'', !!el.dataset.new),
+  crmRemove:async el=>{ const n=el.dataset.n; if(!await confirmBox(LG(`“${n}” standardı ve sertifika değerleri silinsin mi? QC kayıtları silinmez.`,`Delete standard “${n}” and its certified values? QC records are kept.`),LG('Sil','Delete'))) return; DB.settings.crms=crmList().filter(c=>c.name!==n); persist(); render(); },
+  crmPick:el=>{ const f=$('form[data-form="iv"]'); if(!f) return; const t=f.querySelector('[name=tip]'), r=f.querySelector('[name=ref]'); if(t) t.value='Standart (CRM)'; if(r) r.value=el.dataset.n; document.querySelectorAll('[data-act=crmPick]').forEach(b=>b.classList.toggle('on',b===el)); },
+  icCopy:async ()=>{ const P=icSettings(), h=curHole(); const t=holeIntercepts(h,P).IC.map(c=>c.text).join('\n'); try{ await navigator.clipboard.writeText(t); toast(LG('Kopyalandı','Copied')); }catch(_){ modal(`<textarea style="width:100%;height:160px">${esc(t)}</textarea><div class="row end" style="margin-top:10px"><button class="btn" onclick="closeModal()">OK</button></div>`); } },
+  crmAdd:el=>{ const n=el.dataset.n, k=n.replace(/\W/g,'_'), m=num($('#crm_m_'+k).value), sd=num($('#crm_s_'+k).value); if(m==null||!sd){ toast(LG('Sertifika değeri ve SD girin','Enter certified value and SD'),'err'); return; }
+    crmList().push({name:n, el:ui.gx.el, unit:assayIdx.units[ui.gx.el]||'ppm', mean:m, sd}); persist(); render(); },
+  crmDel:el=>{ DB.settings.crms=crmList().filter(c=>!(c.name===el.dataset.n&&c.el===el.dataset.e)); persist(); render(); },
+  pmZoom:el=>{ if(PM) PM.zoomAt(PM.w/2,PM.h/2,+el.dataset.z); },
+  pmFit:()=>{ pmFitAll(); PM&&PM.draw(); },
+  pmPng:async ()=>{ const cv=$('#pmCanvas'); if(!cv) return; try{ const b=await new Promise((r,j)=>cv.toBlob(x=>x?r(x):j(),'image/png')); await saveFile(`${DB.settings.prj}_harita_${stamp()}.png`, b); }catch(_){ toast(LG('PNG oluşturulamadı (altlık karoları dışa aktarmayı engelliyor olabilir; altlığı “Yok” yapıp deneyin)','Could not create PNG (basemap tiles may block export; set basemap to “None” and retry)'),'err'); } },
+  pmLocate:()=>{ if(!navigator.geolocation){ toast(LG('Konum yok','No location'),'err'); return; } navigator.geolocation.getCurrentPosition(p=>{ ui.pm.me={lat:p.coords.latitude, lon:p.coords.longitude}; if(PM){ const [x,y]=merc(ui.pm.me.lat,ui.pm.me.lon); PM.cx=x; PM.cy=y; PM.s=Math.max(PM.s,256*Math.pow(2,15)); PM.draw(); } }, ()=>toast(LG('Konum alınamadı','Could not get location'),'err'), {enableHighAccuracy:true, timeout:15000}); },
+  pmImgAdd:()=>pmImgModal(),
+  pmLyr:(el,e)=>{ if(e&&e.target.closest('input,button')) return; const l=DB.layers.find(x=>x._u===el.dataset.u); if(!l) return; l.vis=l.vis===false; persist(); render(); },
+  pmLyrDel:async el=>{ const l=DB.layers.find(x=>x._u===el.dataset.u); if(!l) return; if(!await confirmBox(LG(`“${l.name}” katmanı silinsin mi?`,`Delete layer “${l.name}”?`),LG('Sil','Delete'))) return; DB.layers=DB.layers.filter(x=>x!==l); if(l.kind==='image'){ await imgDel('img_'+l._u); IMGS.delete(l._u); } persist(); render(); },
+  pmOpen:()=>{ const f=ui.pm.sel; if(!f) return; if(f.k==='d'){ ui.hole=f.ref._u; ui.htab='collar'; holeEdit=null; go('sondaj'); } else if(f.k==='s'){ edit={isNew:false, rec:JSON.parse(JSON.stringify(f.ref))}; go('yeni'); } else if(f.k==='o'){ obsEdit={isNew:false, rec:JSON.parse(JSON.stringify(f.ref))}; ui.otab='koord'; go('gozlem'); } },
   go:el=>{ if(el.dataset.v==='olcum') ui.measObs=null; if(el.dataset.v==='yeni' && ui.view!=='yeni') edit=null; if(el.dataset.v==='gozlem') obsEdit=null; if(el.dataset.v==='sondaj'){ holeEdit=null; } go(el.dataset.v); },
   filter:el=>{ ui.filter=el.dataset.f; render(); },
   new:el=>{ startNew(el.dataset.t); go('yeni'); },
@@ -2914,7 +3414,7 @@ const ACT = {
     if(a==null||b==null||!L||b<=a){ toast('Başlangıç, bitiş ve uzunluk girin','err'); return; }
     let n=0; for(let d=a; d<b-1e-6; d=+(d+L).toFixed(3)){ const to=Math.min(b,+(d+L).toFixed(3)); const id=nextDrillId(h); h.samp.push({_u:uid(),from:d,to,id,tip,agirlik:'',not:''}); usedDrillId(h,id); n++; if(n>500) break; }
     h.samp.sort((x,y)=>x.from-y.from); persist(); toast(`${n} numune aralığı oluşturuldu`); render(); },
-  exp:async el=>{ if(el.dataset.x==='json'){ await backupJSON(); return; } const [n,t]=buildExport(el.dataset.x); await saveFile(n,t); },
+  exp:async el=>{ if(el.dataset.x==='json'){ await backupJSON(); return; } if(['assay','icpt'].includes(el.dataset.x)){ await ensureAssayIndex(); const p=DB.settings.prj; if(el.dataset.x==='assay') await saveFile(`${p}_assay.csv`, assayCSV()); else await saveFile(`${p}_intercepts.csv`, interceptsCSV()); return; } const [n,t]=buildExport(el.dataset.x); await saveFile(n,t); },
   dispatch:()=>doDispatch(),
   demo:()=>demo(),
   wipe:async()=>{ if(!await confirmBox('TÜM örnekler, saha gözlemleri, fotoğraflar, ölçümler ve sondaj kayıtları silinecek. Önce JSON yedek aldınız mı?','Hepsini sil')) return; const st=DB.settings; edit=null; obsEdit=null; DB=defaults(); DB.settings=st; DB.settings.counters=defaults().settings.counters; persist(); gcPhotos(); toast('Veriler silindi'); render(); }
@@ -2982,6 +3482,14 @@ document.addEventListener('change', e=>{
   if(t.dataset.on==='gcBase'){ ui.gx.base=t.value; gcMap.tileWarned=false; gcDraw(); return; }
   if(t.dataset.on==='gcIdw'){ ui.gx.idw=t.checked; gcDraw(); return; }
   if(t.dataset.on==='gcLab'){ ui.gx.labels=t.checked; gcDraw(); return; }
+  if(t.dataset.on==='icSet'){ const P=icSettings(), k=t.dataset.k; P[k]=t.tagName==='SELECT'?t.value:t.value; if(k==='el') P.unit=repUnitDefault(t.value); persist(); render(); return; }
+  if(t.dataset.on==='blankLim'){ DB.settings.blankLim=DB.settings.blankLim||{}; DB.settings.blankLim[ui.gx.el]=num(t.value); persist(); render(); return; }
+  if(t.dataset.on==='dupExcl'){ ui.gx.dupExcl=t.checked; render(); return; }
+  if(t.dataset.on==='pmLay'){ ui.pm.lay[t.dataset.k]=t.checked; if(t.dataset.k==='g'&&t.checked&&ui.pm.gc&&!ui.pm.gel) ui.pm.gel=ui.pm.gc.els.includes('Au')?'Au':ui.pm.gc.els[0]; render(); return; }
+  if(t.dataset.on==='pmGel'){ ui.pm.gel=t.value; PM&&PM.draw(); return; }
+  if(t.dataset.on==='pmBase'){ ui.pm.base=t.value; PM&&PM.draw(); return; }
+  if(t.dataset.on==='pmOp'){ const l=DB.layers.find(x=>x._u===t.dataset.u); if(l){ l.op=+t.value; persist(); PM&&PM.draw(); } return; }
+  if(t.dataset.on==='pmKml' && t.files[0]){ pmImportKml(t.files[0]); t.value=''; return; }
   if(t.dataset.on==='gcThr'){ ui.gx.thr=+t.value; render(); return; }
   if(t.dataset.gcel!=null && ui.gcImp){ ui.gcImp.els[+t.dataset.gcel].on=t.checked; render(); return; }
   if(t.dataset.gci && ui.gcImp){ const k=t.dataset.gci, imp=ui.gcImp;
@@ -3000,9 +3508,9 @@ document.addEventListener('change', e=>{
       try{ const d=JSON.parse(r.result); if(!Array.isArray(d.samples)) throw 0;
         const nph=d.photoData?Object.keys(d.photoData).length:0;
         if(!await confirmBox(`Yedekte ${d.samples.length} örnek, ${(d.obs||[]).length} saha gözlemi, ${(d.meas||[]).length} ölçüm, ${(d.holes||[]).length} kuyu${nph?`, ${nph} fotoğraf`:''} var. Bu projedeki mevcut verinin yerine geçsin mi? (Yeni proje olarak açmak için ana ekrandaki “Yedekten proje aç”ı kullanın.)`,'İçe aktar',false)) return;
-        const pd=d.photoData; delete d.photoData; delete d.project; const gd=d.gcData; delete d.gcData;
+        const pd=d.photoData; delete d.photoData; delete d.project; const gd=d.gcData; delete d.gcData; const imd=d.imgData; delete d.imgData;
         DB=normalize(d); persist(); ui.gx&&(ui.gx.key=null);
-        if(gd){ for(const [k,r] of Object.entries(gd)) await gcPut(k,r); }
+        if(gd){ for(const [k,r] of Object.entries(gd)) await gcPut(k,r); } if(imd){ for(const [k,u] of Object.entries(imd)){ try{ await imgPut(k, dataURLToBlob(u)); }catch(_){} } } IMGS.clear();
         if(pd){ for(const [id,u] of Object.entries(pd)){ try{ const full=dataURLToBlob(u); const {thumb}=await makePhotoBlobs(full); await phPut({id, full, thumb}); }catch(_){} } }
         toast('Yedek yüklendi'); render();
       }catch(_){ toast('Geçersiz yedek dosyası','err'); }
