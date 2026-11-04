@@ -163,6 +163,9 @@ table.lg td.act button{border:0;background:none;color:#a39d8f;cursor:pointer;pad
 table.lg td.act button:hover{color:var(--err)}
 @media(max-width:600px){table.lg .st2{position:static}}
 .mbox.wide{max-width:980px}
+.chip .gcx{border:0;background:none;color:inherit;opacity:.55;cursor:pointer;padding:0 0 0 4px;font-size:12px}
+.chip .gcx:hover{opacity:1}
+@media(max-width:899px){.bottom button{font-size:10.5px}}
 /* ana ekran */
 body.homemode .side, body.homemode .bottom{display:none}
 body.homemode main{max-width:none;padding:0;margin:0}
@@ -373,7 +376,7 @@ function defaults(){
     decl:5.5, qcEvery:20, zone:35, csv:'std',
     logCols:JSON.parse(JSON.stringify(DEFAULT_LOGCOLS)), colsVer:3,
     showArc:true, arcTf:'6906'
-  }, samples:[], meas:[], holes:[], obs:[]};
+  }, samples:[], meas:[], holes:[], obs:[], geochem:[]};
 }
 let memOnly = false;
 /* ---------- depolama + projeler ---------- */
@@ -406,7 +409,7 @@ function normalize(d){
   d.settings = Object.assign(def.settings, d.settings||{});
   d.settings.codes = Object.assign(defaults().settings.codes, d.settings.codes||{});
   d.settings.counters = Object.assign(defaults().settings.counters, d.settings.counters||{});
-  d.samples = d.samples||[]; d.meas = d.meas||[]; d.holes = d.holes||[]; d.obs = d.obs||[];
+  d.samples = d.samples||[]; d.meas = d.meas||[]; d.holes = d.holes||[]; d.obs = d.obs||[]; d.geochem = d.geochem||[];
   d.samples.forEach(r=>{ r._u=r._u||uid(); });
   d.holes.forEach(h=>{h.survey=h.survey||[];h.lith=h.lith||[];h.samp=h.samp||[];h.qc=h.qc||[];
     h.samp=h.samp.filter(r=>{ if(/duplikat|Standart|Blank/i.test(r.tip||'')){ h.qc.push({_u:r._u||uid(), id:r.id, tip:/Standart/i.test(r.tip)?'Standart (CRM)':/Blank/i.test(r.tip)?'Blank':'Saha duplikatı', ref:'', from:r.from, to:r.to, not:r.not||''}); return false; } return true; });
@@ -431,7 +434,7 @@ function openProject(id, view){
   const m=APP.projects.find(p=>p.id===id); if(!m) return;
   try{ DB=normalize(JSON.parse(sget(PKEY(id))||'null')||defaults()); }catch(e){ DB=defaults(); }
   APP.current=id; saveApp();
-  edit=null; obsEdit=null; holeEdit=null; ui.hole=null; ui.dbSel=new Set();
+  edit=null; obsEdit=null; holeEdit=null; ui.hole=null; ui.dbSel=new Set(); ui.gx=null; ui.gcImp=null; ui.gcView='main'; gcMap.fit=false;
   go(view||'ornekler');
 }
 function exitProject(){
@@ -455,7 +458,7 @@ function tr(s){
 }
 const T = tr;
 const LG = (trS, enS) => LANG==='en' ? enS : trS;
-I18N_EN={"Yazma": "None", "Yeni gözlem oluştur": "Create new observation", "Mevcut gözleme ekle": "Add to existing observation", "Bağlı kayaç örneği": "Linked rock sample", "← Gözleme dön": "← Back to observation", "Ölçüm, seçtiğiniz saha gözlemine yapı tipine göre bir cümle olarak yazılır.": "The measurement is written to the chosen field observation as a sentence based on the structure type.", "Ölçümü düzenle": "Edit measurement", "✎ Düzenle": "✎ Edit", "Düzenle": "Edit", "Saha gözlemine yaz": "Write to field observation", "Yeni saha gözlemi oluştur": "Create new field observation", "Saha gözlemine yazma": "Don't write to an observation", "Konumu yenile": "Refresh position", "Konum bekleniyor…": "Waiting for position…", "Kayıtlı konum": "Saved position", "Kilitle": "Lock", "Kilidi aç": "Unlock", "← Ana ekran": "← Home", "Ölçümler": "Measurements", "Saha gözlemi": "Field observation", "Saha gözlemleri": "Field observations", "Gözlem": "Observation", "Örnekler": "Samples", "Yeni örnek": "New sample", "Yeni": "New", "Ölçüm": "Measure", "Sondaj": "Drilling", "Veritabanı": "Database", "Aktar / Ayar": "Export / Settings", "Aktar": "Export", "Saha defteri": "Field notebook", "⟵ Projeden çık": "⟵ Exit project", "← Geri": "← Back", "← Liste": "← List", "TR": "TR", "EN": "EN", "Jeolog saha aracı · örnek, gözlem, ölçüm ve sondaj kaydı": "Geologist's field tool · samples, observations, measurements and drill logs", "+ Yeni Proje": "+ New Project", "Yeni Proje": "New Project", "Yeni proje": "New project", "Yedekten proje aç (JSON)": "Open project from backup (JSON)", "Yedekten proje aç": "Open project from backup", "Deneme projesi oluştur": "Create demo project", "Projeler": "Projects", "Aç": "Open", "Projeyi sil": "Delete project", "GEO + TOOL (tersten LOOT)": "GEO + TOOL (LOOT reversed)", "veriler bu cihazda saklanır": "data is stored on this device", "Proje adı": "Project name", "Proje kodu": "Project code", "Ülke": "Country", "İl / eyalet / bölge": "Province / state / region", "İlçe / mevkii": "District / locality", "Ruhsat no": "Licence no.", "Şirket / müşteri": "Company / client", "Proje jeoloğu": "Project geologist", "Başlangıç tarihi": "Start date", "Açıklama": "Description", "Projeyi oluştur ve aç": "Create and open project", "Proje bilgileri": "Project details", "Proje bilgilerini düzenle": "Edit project details", "Proje kodu numune numaralarının başına gelir ({PRJ}). Ülke Zimbabve seçilirse Arc 1950 koordinatları otomatik açılır.": "The project code is used as the sample number prefix ({PRJ}). If Zimbabwe is selected as the country, Arc 1950 coordinates are switched on automatically.", "ör. Kocaçay Au-Cu arama projesi": "e.g. Kocaçay Au-Cu exploration project", "ör. KRB": "e.g. KRB", "Kaydet": "Save", "Vazgeç": "Cancel", "Sil": "Delete", "Evet": "Yes", "Kapat": "Close", "Tamam": "OK", "Ekle": "Add", "Güncelle": "Update", "Oluştur": "Create", "İndir": "Download", "Kopyala": "Copy", "Tümü": "All", "Tümünü seç": "Select all", "Sırala": "Sort", "Numara": "Number", "Tarih": "Date", "Saat": "Time", "Tip": "Type", "Durum": "Status", "Not": "Note", "Yok": "None", "Diğer": "Other", "Genel": "General", "Jeolog": "Geologist", "Konum": "Location", "Koordinat": "Coordinates", "Bilgi": "Info", "Kaynak": "Source", "Yüzey": "Surface", "Özet": "Summary", "Örnek listesi": "Sample list", "Toplam örnek": "Total samples", "Sediman": "Stream sed.", "Toprak": "Soil", "Kayaç": "Rock", "QC": "QC", "Laba gönderilmedi": "Not sent to lab", "+ Sediman": "+ Stream sed.", "+ Toprak": "+ Soil", "+ Kayaç": "+ Rock", "+ QC": "+ QC", "Ara: örnek no, litoloji, dere adı, not…": "Search: sample no., lithology, stream name, note…", "Örnek no": "Sample no.", "UTM E / N": "UTM E / N", "Filtreye uyan örnek yok.": "No samples match the filter.", "Henüz örnek yok. Yukarıdaki düğmelerle yeni örnek ekleyin.": "No samples yet. Add a new sample with the buttons above.", "Deneme verisi yükle": "Load demo data", "Arazide": "In field", "Gönderildi": "Sent", "Sonuç geldi": "Results received", "Laba gönderildi": "Sent to lab", "Örneği düzenle": "Edit sample", "Otomatik numarayı yeniden üret": "Regenerate automatic number", "Numara ayarlardaki biçime göre otomatik verilir; elle de değiştirebilirsiniz.": "The number is assigned automatically from the format in Settings; you can also change it manually.", "Dere sedimanı": "Stream sediment", "Dere sedimanı bilgileri": "Stream sediment details", "Toprak bilgileri": "Soil details", "Kayaç bilgileri": "Rock details", "QC (standart / blank / duplikat)": "QC (standard / blank / duplicate)", "QC (standart / blank / duplikat) bilgileri": "QC (standard / blank / duplicate) details", "Harici kamera foto no": "External camera photo no.", "Dere / kol adı": "Stream / tributary name", "Akış durumu": "Flow", "Aktif": "Active", "Zayıf akış": "Weak flow", "Durgun": "Stagnant", "Kuru": "Dry", "Dere genişliği": "Stream width", "Fraksiyon": "Fraction", "Ağır mineral (pan)": "Heavy mineral (pan)", "Malzeme": "Material", "Kum": "Sand", "Silt-kum": "Silt-sand", "Silt-kil": "Silt-clay", "Çakıllı kum": "Gravelly sand", "Organik": "Organic", "Havza litolojisi": "Catchment lithology", "Kirlilik riski": "Contamination risk", "Yol": "Road", "Yerleşim": "Settlement", "Tarım": "Agriculture", "Eski maden / cüruf": "Old mine / slag", "Ağırlık": "Weight", "Horizon": "Horizon", "Karışık": "Mixed", "Derinlik": "Depth", "Renk (Munsell)": "Colour (Munsell)", "Doku": "Texture", "Tınlı kum": "Loamy sand", "Tın": "Loam", "Siltli tın": "Silt loam", "Killi tın": "Clay loam", "Kil": "Clay", "Nem": "Moisture", "Nemli": "Moist", "Islak": "Wet", "Taşlılık": "Stoniness", "Rejolit": "Regolith", "Yerinde (residual)": "In situ (residual)", "Koluvyon": "Colluvium", "Alüvyon": "Alluvium", "Moloz / dolgu": "Debris / fill", "Arazi kullanımı": "Land use", "Orman": "Forest", "Mera": "Pasture", "Çıplak": "Bare", "Yerleşim yakını": "Near settlement", "Örnek tipi": "Sample type", "Mostra (outcrop)": "Outcrop", "Float (taşınmış)": "Float", "Chip": "Chip", "Kanal (channel)": "Channel", "Grab": "Grab", "Kompozit": "Composite", "Kanal / chip uzunluğu": "Channel / chip length", "Litoloji": "Lithology", "Alterasyon": "Alteration", "Alterasyon şiddeti": "Alteration intensity", "Cevherleşme": "Mineralisation", "Sülfit / cevher": "Sulphide / ore", "Damar (tip / kalınlık)": "Vein (type / thickness)", "QC tipi": "QC type", "Standart (CRM)": "Standard (CRM)", "Blank": "Blank", "Saha duplikatı": "Field duplicate", "Hazırlık duplikatı": "Preparation duplicate", "CRM / blank adı": "CRM / blank name", "Asıl örnek no (duplikat için)": "Original sample no. (for duplicates)", "Gönderim no": "Dispatch no.", "Açıklama / gözlem": "Description / observation", "Durum ve açıklama": "Status and description", "Fotoğraflar": "Photos", "Yapısal ölçümler": "Structural measurements", "Bu örneğe bağlı ölçüm yok.": "No measurements linked to this sample.", "+ Doğrultu / eğim ölçümü ekle": "+ Add strike / dip measurement", "Kaydet + yeni sediman": "Save + new stream sed.", "Kaydet + yeni toprak": "Save + new soil", "Kaydet + yeni kayaç": "Save + new rock", "Kaydet + yeni qc": "Save + new QC", "Duplikat oluştur": "Create duplicate", "Enlem": "Latitude", "Boylam": "Longitude", "GPS doğruluğu": "GPS accuracy", "Kot": "Elevation", "Zon": "Zone", "Yarıküre": "Hemisphere", "K – kuzey": "N – north", "G – güney": "S – south", "Doğu (E)": "Easting (E)", "Kuzey (N)": "Northing (N)", "WGS84 – coğrafi (enlem / boylam)": "WGS84 – geographic (lat / long)", "WGS84 – UTM": "WGS84 – UTM", "Arc 1950 – UTM": "Arc 1950 – UTM", "Zimbabve": "Zimbabwe", "Clarke 1880": "Clarke 1880", "(ondalık °)": "(decimal °)", "GPS ile konum al": "Get GPS position", "Konum kayıtlı": "Position saved", "Konum yok": "No position", "Uydu bekleniyor…": "Waiting for satellites…", "Durduruldu": "Stopped", "Bu cihazda GPS yok": "No GPS on this device", "Konum izni yok / bu pencerede kapalı": "No location permission / blocked in this window", "Konum alınamadı": "Position not available", "Herhangi bir sistemde girdiğiniz koordinat diğerlerine otomatik çevrilir.": "A coordinate entered in any system is converted to the others automatically.", "Arc 1950 değerleri yalnızca güney Afrika koordinatları için hesaplanır.": "Arc 1950 values are only computed for southern African coordinates.", "Kamera": "Camera", "Galeriden ekle": "Add from gallery", "Henüz fotoğraf yok.": "No photos yet.", "Bitti": "Done", "Foto no": "Photo no.", "foto": "photos", "Fotoğraf bu cihazda bulunamadı (başka cihazda çekilmiş olabilir).": "Photo not found on this device (it may have been taken on another device).", "konum yok": "no position", "Emin misiniz? Tekrar basın": "Are you sure? Tap again", "Silmek için tekrar basın": "Tap again to delete", "Fotoğraf": "Photo", "+ Yeni gözlem": "+ New observation", "+ İlk gözlemi ekle": "+ Add the first observation", "Henüz saha gözlemi yok.": "No field observations yet.", "Yeni saha gözlemi": "New field observation", "Gözlem no": "Observation no.", "Başlık": "Title", "Yorum ve gözlem": "Comments and observations", "Gözlem tipi": "Observation type", "Mostra": "Outcrop", "Litoloji kontağı": "Lithological contact", "Yapısal gözlem": "Structural observation", "Alterasyon zonu": "Alteration zone", "Eski işletme / galeri": "Old working / adit", "Anomali kontrolü": "Anomaly follow-up", "Erişim / lojistik": "Access / logistics", "Yorum": "Interpretation", "Öneri / yapılacaklar": "Recommendations / to do", "+ Doğrultu / eğim ölçümü": "+ Strike / dip measurement", "ör. Kocaçay güneyi silisli breş mostrası": "e.g. silicified breccia outcrop south of Kocaçay", "Doğrultu / eğim ölçümü": "Strike / dip measurement", "Eğim": "Dip", "Eğim yönü": "Dip direction", "Doğrultu (sağ el)": "Strike (RHR)", "Doğrultu": "Strike", "Sensörü başlat": "Start sensor", "Sensörü durdur": "Stop sensor", "Kilitle": "Lock", "Kilidi aç": "Unlock", "Telefonu ekranı yukarı bakacak şekilde ölçülecek yüzeye yatırın, değer oturunca “Kilitle”, sonra “Kaydet”.": "Lay the phone screen-up on the surface to be measured; when the reading settles press “Lock”, then “Save”.", "Ölçümü kaydet": "Save measurement", "Yapı tipi": "Structure type", "Tabaka": "Bedding", "Foliasyon": "Foliation", "Fay": "Fault", "Damar": "Vein", "Eklem": "Joint", "Kontak": "Contact", "Yöntem": "Method", "Elle": "Manual", "Telefon": "Phone", "Brunton / pusula": "Brunton / compass", "Bağlı örnek / gözlem": "Linked sample / observation", "Kayaç örnekleri": "Rock samples", "Konum al": "Get position", "Stereonet": "Stereonet", "(Schmidt, alt yarıküre)": "(Schmidt, lower hemisphere)", "Büyük daireler": "Great circles", "Ölçüm yok": "No measurements", "Henüz ölçüm yok.": "No measurements yet.", "Eğim / Eğim yönü": "Dip / Dip direction", "Sondaj kuyuları": "Drill holes", "+ Yeni kuyu": "+ New hole", "Yeni kuyu": "New hole", "Henüz kuyu yok. “+ Yeni kuyu” ile başlayın.": "No holes yet. Start with “+ New hole”.", "Kuyu bilgisi": "Hole info", "Kuyu bilgileri": "Hole details", "Kuyu başı (collar)": "Collar", "Kuyu adı": "Hole ID", "Saha / prospekt": "Area / prospect", "Planlandı": "Planned", "Devam ediyor": "In progress", "Tamamlandı": "Completed", "Terk": "Abandoned", "İlk numune no": "First sample no.", "Sondaj bilgileri": "Drilling details", "Azimut": "Azimuth", "Planlanan derinlik": "Planned depth", "Son derinlik (EOH)": "Final depth (EOH)", "Karot çapı": "Core size", "Sondaj firması / makine": "Drilling contractor / rig", "Başlangıç": "Start", "Bitiş": "End", "Loglayan jeolog": "Logged by", "Kuyuyu sil": "Delete hole", "ör. KRB-DH-001": "e.g. KRB-DH-001", "ör. KRB12001": "e.g. KRB12001", "Grafik log": "Graphic log", "Örnekleme listesi": "Sampling list", "Log tablosu": "Log table", "⚙ Sütunları düzenle": "⚙ Edit columns", "Aralık": "Interval", "Recovery": "Recovery", "RQD": "RQD", "Örnekleme": "Sampling", "numune": "sample", "m (≥10 cm parçalar)": "m (pieces ≥10 cm)", "Örnekle": "Sample", "+ Aralık ekle": "+ Add interval", "+ Öncekini kopyalayarak ekle": "+ Add copying previous", "Derinliğe göre sırala": "Sort by depth", "Aralığı sil": "Delete interval", "Henüz aralık yok. “+ Aralık ekle” ile başlayın.": "No intervals yet. Start with “+ Add interval”.", "Sıralandı": "Sorted", "Litoloji 1": "Lithology 1", "Litoloji 2": "Lithology 2", "Litoloji 3": "Lithology 3", "Marker": "Marker", "Alt. şiddeti": "Alt. intensity", "Cevher": "Ore", "Kırık sayısı": "Fracture count", "adet (doğal)": "count (natural)", "Kırık / m": "Fractures / m", "÷ recovery": "÷ recovery", "α açısı": "α angle", "β açısı": "β angle", "° (karot eksenine)": "° (to core axis)", "° (referans hattan)": "° (from reference line)", "Dayanım (ISRM)": "Strength (ISRM)", "Ayrışma (ISRM)": "Weathering (ISRM)", "Süreksizlik takımı": "Joint sets", "adet": "count", "Yüzey pürüzlülüğü": "Joint roughness", "Süreksizlik dolgusu": "Joint infill", "Çok pürüzlü": "Very rough", "Pürüzlü": "Rough", "Az pürüzlü": "Slightly rough", "Düz": "Smooth", "Kaygan / aynalı": "Slickensided", "Temiz": "Clean", "Kalsit": "Calcite", "Kuvars": "Quartz", "Limonit / oksit": "Limonite / oxide", "Klorit": "Chlorite", "Grafit": "Graphite", "Jips": "Gypsum", "Fay unu (gouge)": "Fault gouge", "W1 Taze": "W1 Fresh", "W2 Az ayrışmış": "W2 Slightly weathered", "W3 Orta ayrışmış": "W3 Moderately weathered", "W4 Çok ayrışmış": "W4 Highly weathered", "W5 Tamamen ayrışmış": "W5 Completely weathered", "W6 Rezidüel toprak": "W6 Residual soil", "Bölerek örnekle": "Split into samples", "Tek numune (tüm aralık)": "Single sample (whole interval)", "Numune boyu (m)": "Sample length (m)", "Yarım boydan kısa kalan son parçayı bir önceki numuneye ekle": "Add a last piece shorter than half a sample length to the previous sample", "Bu numuneleri sil": "Delete these samples", "Numune listesine git": "Go to sample list", "Numuneleri oluştur": "Create samples", "1 numune oluştur": "Create 1 sample", "Litoloji girilmemiş": "No lithology entered", "Log sütunları": "Log columns", "Sütun adı": "Column name", "CSV başlığı": "CSV header", "Seçenekler": "Options", "(virgülle)": "(comma-separated)", "Birim": "Unit", "Yukarı": "Up", "Aşağı": "Down", "Kaldır": "Remove", "+ Sütun ekle": "+ Add column", "Varsayılana dön": "Reset to default", "Yeni sütun": "New column", "From, To, Aralık, Recovery ve RQD sütunları sabittir. Diğer sütunları buradan ekleyebilir, yeniden adlandırabilir, sıralayabilir veya kaldırabilirsiniz. Sütun adı değişince mevcut veriler korunur. Bu ayar projedeki tüm kuyular için geçerlidir.": "The From, To, Interval, Recovery and RQD columns are fixed. Other columns can be added, renamed, reordered or removed here. Renaming a column keeps existing data. This setting applies to all holes in the project.", "Liste + serbest yazım": "List + free text", "Sabit liste": "Fixed list", "Metin": "Text", "Sayı": "Number", "Sütunlar kaydedildi": "Columns saved", "Numune": "Sample", "Numune no": "Sample no.", "Numune aralıkları": "Sample intervals", "Baş.": "From", "Bit.": "To", "Boy (m)": "Length (m)", "Boy": "Length", "Yarım karot": "Half core", "Çeyrek karot": "Quarter core", "Tüm karot": "Whole core", "RC kırıntı": "RC chips", "Yeni aralık": "New interval", "Aralığı düzenle": "Edit interval", "Toplu numune aralığı oluştur": "Create sample intervals in bulk", "(ör. 20–50 m arası her 1 m)": "(e.g. every 1 m from 20 to 50 m)", "Aralık uzunluğu (m)": "Interval length (m)", "Başlangıç (m)": "From (m)", "Bitiş (m)": "To (m)", "Yeni QA/QC örneği": "New QA/QC sample", "QC örneğini düzenle": "Edit QC sample", "QA/QC örnekleri": "QA/QC samples", "Referans (CRM adı / asıl numune no)": "Reference (CRM name / original sample no.)", "Referans": "Reference", "Başlangıç (duplikat için)": "From (for duplicates)", "Bitiş (duplikat için)": "To (for duplicates)", "Kaba red (coarse) duplikatı": "Coarse reject duplicate", "Pulp duplikatı": "Pulp duplicate", "Standart ve blank için CRM / blank adını, duplikat için asıl numune numarasını referansa yazın. Asıl numune seçilirse derinlikler otomatik doldurulur.": "For standards and blanks enter the CRM / blank name as reference; for duplicates enter the original sample number. Depths are filled in automatically when an original sample is selected.", "Survey": "Survey", "Yeni ölçüm": "New reading", "Collar (plan)": "Collar (planned)", "Gyro": "Gyro", "Reflex EZ-Shot": "Reflex EZ-Shot", "Multishot": "Multishot", "Kayıt yok.": "No records.", "Ölçek": "Scale", "Litoloji 1 · 2 · 3": "Lithology 1 · 2 · 3", "Cevher %": "Ore %", "Recovery / RQD": "Recovery / RQD", "rec": "rec", "Numuneler ve QA/QC örnekleri numara sırasıyla tek listede. Bu listeyi PDF olarak indirip örneklemeyi yapacak ekibe verebilirsiniz.": "Samples and QA/QC samples in a single list in number order. Download it as a PDF and hand it to the sampling crew.", "PDF indir": "Download PDF", "Excel (CSV)": "Excel (CSV)", "Yazdır": "Print", "Derinlikten (m)": "From depth (m)", "– boş: tümü": "– empty: all", "Derinliğe (m)": "To depth (m)", "Standart": "Standard", "Lab. duplikatı": "Lab duplicate", "Sıra": "No.", "Tür": "Kind", "Talimat": "Instruction", "Kesildi": "Cut", "Torbalandı": "Bagged", "Torba": "Bag", "Litoloji / not": "Lithology / note", "Listelenecek numune yok. Log sekmesinde “Örnekle” ile veya Numune sekmesinden numune ekleyin.": "No samples to list. Add samples with “Sample” in the Log tab or from the Sample tab.", "PDF kütüphanesi yüklenemedi": "PDF library could not be loaded", "Açılır pencere engellendi": "Pop-up blocked", "Örnek veritabanı": "Sample database", "Ara: numune no, kuyu, litoloji, tip…": "Search: sample no., hole, lithology, type…", "Yüzey QC": "Surface QC", "Sondaj numunesi": "Drill sample", "Sondaj QC": "Drill QC", "Seçilenleri sil": "Delete selected", "Seçimi temizle": "Clear selection", "Listeyi CSV indir": "Download list as CSV", "Filtreye uyan kayıt yok.": "No records match the filter.", "Konum / derinlik": "Location / depth", "Dışa aktarım ve ayarlar": "Export and settings", "Örnekler ve gözlemler": "Samples and observations", "Tüm örnekler (CSV)": "All samples (CSV)", "Yapısal ölçümler (CSV)": "Structural measurements (CSV)", "Saha gözlemleri (CSV)": "Field observations (CSV)", "Fotoğraf listesi (CSV)": "Photo list (CSV)", "Laboratuvar gönderim listesi": "Laboratory dispatch list", "Durumu “Arazide” olan örneklerden liste hazırlar, indirir ve bu örnekleri “Laba gönderildi” olarak işaretler.": "Builds a list from samples with status “In field”, downloads it and marks them as “Sent to lab”.", "Laboratuvar": "Laboratory", "ör. ALS İzmir": "e.g. ALS Izmir", "Gönderim listesini oluştur": "Create dispatch list", "Sondaj (Leapfrog / Micromine / Datamine tablo biçimi)": "Drilling (Leapfrog / Micromine / Datamine table format)", "(numune + QC, sıralı)": "(samples + QC, in order)", "Yedek": "Backup", "JSON yedek indir": "Download JSON backup", "fotoğrafları da ekle": "include photos", "Yedeği içe aktar": "Import backup", "Deneme verisi ekle": "Add demo data", "Tüm veriyi sil": "Delete all data", "Ayarlar": "Settings", "Varsayılan jeolog": "Default geologist", "Numara biçimi": "Number format", "— {PRJ} proje, {TIP} tip kodu, {YY} yıl, {NO} sıra": "— {PRJ} project, {TIP} type code, {YY} year, {NO} sequence", "Sıra no hane sayısı": "Sequence digits", "Ortak sıra (tüm tipler tek sayaç)": "Shared sequence (one counter for all types)", "Hayır – her tipin kendi sırası": "No – each type has its own sequence", "Evet – tek sayaç": "Yes – single counter", "Manyetik sapma": "Magnetic declination", "(°, doğu +)": "(°, east +)", "QC hatırlatma (her N örnekte)": "QC reminder (every N samples)", "Varsayılan UTM zon": "Default UTM zone", "CSV biçimi": "CSV format", "Standart (virgül, nokta ondalık)": "Standard (comma, dot decimal)", "Türkçe Excel (noktalı virgül, virgül ondalık)": "Turkish Excel (semicolon, comma decimal)", "Arc 1950 (Zimbabve) koordinatları": "Arc 1950 (Zimbabwe) coordinates", "Göster": "Show", "Gizle": "Hide", "Arc 1950 → WGS84 dönüşüm parametreleri": "Arc 1950 → WGS84 transformation parameters", "Örnek:": "Example:", "Ayarları kaydet": "Save settings", "Ayarlar kaydedildi": "Settings saved", "Zimbabve – EPSG:6906 (NGA 2014): −145, −97, −292 m": "Zimbabwe – EPSG:6906 (NGA 2014): −145, −97, −292 m", "Zimbabve – EPSG:1121 (DMA 1987): −142, −96, −293 m": "Zimbabwe – EPSG:1121 (DMA 1987): −142, −96, −293 m", "Arc 1950 ortalama – EPSG:1113: −143, −90, −294 m": "Arc 1950 mean – EPSG:1113: −143, −90, −294 m", "Zimbabve: UTM zon 35S (30°D batısı) veya 36S. Türkiye için manyetik sapma 2026’da yaklaşık +5° ile +6° arasıdır; çalışma alanınız için NOAA hesaplayıcısıyla kontrol edin.": "Zimbabwe: UTM zone 35S (west of 30°E) or 36S. Magnetic declination in Türkiye is roughly +5° to +6° in 2026; check your area with the NOAA calculator.", "Ortak": "Shared", "(cm)": "(cm)", "(kg)": "(kg)", "(m)": "(m)", "(° (aşağı −))": "(° (down −))", "° (aşağı −)": "° (down −)", "Örnek": "Example", "Bu kayıt silinsin mi?": "Delete this record?", "Ölçüm silinsin mi?": "Delete this measurement?", "Silindi": "Deleted", "Kopyalandı": "Copied", "Metni seçip kopyalayın": "Select the text and copy it", "Bu pencerede dosya indirilemedi": "The file could not be downloaded in this window", "Bu pencerede dosya indirilemedi. İçeriği kopyalayıp bir dosyaya yapıştırabilirsiniz.": "The file could not be downloaded in this window. You can copy the content and paste it into a file.", "TÜM örnekler, saha gözlemleri, fotoğraflar, ölçümler ve sondaj kayıtları silinecek. Önce JSON yedek aldınız mı?": "ALL samples, field observations, photos, measurements and drill records will be deleted. Have you made a JSON backup first?", "Hepsini sil": "Delete everything", "Veriler silindi": "Data deleted", "Yedek yüklendi": "Backup loaded", "Geçersiz yedek dosyası": "Invalid backup file", "Deneme verisi eklendi": "Demo data added", "İçe aktar": "Import", "Proje adı girin": "Enter a project name", "Proje bilgileri kaydedildi": "Project details saved", "Proje silindi": "Project deleted", "Gönderilecek örnek yok": "No samples to send", "Örnek no boş olamaz": "Sample no. cannot be empty", "Gözlem no boş olamaz": "Observation no. cannot be empty", "Numune no girin": "Enter a sample no.", "Kuyu adı girin": "Enter a hole ID", "Bu kuyu adı zaten var": "This hole ID already exists", "Kuyu kaydedildi": "Hole saved", "Derinlik girin": "Enter a depth", "Bitiş, başlangıçtan büyük olmalı": "To must be greater than From", "Başlangıç, bitiş ve uzunluk girin": "Enter from, to and length", "Eklendi": "Added", "Güncellendi": "Updated", "Önce bu aralığın From ve To değerlerini girin": "Enter From and To for this interval first", "Eğim (0–90°) ve eğim yönü/doğrultu girin": "Enter dip (0–90°) and dip direction/strike", "Sensör izni verilmedi": "Sensor permission denied", "Duplikat için QC kaydı açıldı": "QC record opened for the duplicate", "Fotoğraf kaydedilemedi": "Photo could not be saved", "Bu önizleme penceresi konuma izin vermiyor. Telefonda kurulu sürümde çalışır; şimdilik koordinatı elle girin.": "This preview window does not allow location access. It works in the installed phone version; enter the coordinate manually for now.", "Uygulama içi kamera bu pencerede açılamadı; cihazın kamerası açılıyor.": "The in-app camera could not open in this window; opening the device camera.", "⚠ Sensör verisi gelmiyor. Bu önizleme penceresi hareket/pusula sensörlerine izin vermiyor ya da cihazda sensör yok (PC). Uygulama telefonda HTTPS adresinden açıldığında çalışır. Şimdilik değerleri aşağıya elle girin.": "⚠ No sensor data. This preview window does not allow motion/compass sensors, or the device has none (PC). It works when the app is opened on a phone from an HTTPS address. Enter values manually below for now.", "🔒 Kilitli.": "🔒 Locked.", "Canlı ölçüm.": "Live reading.", "⚠ Pusula yönü göreli olabilir — eğim yönünü kontrol edin.": "⚠ Compass heading may be relative — check the dip direction.", "ÖRNEKLEME LİSTESİ": "SAMPLING LIST", "Hazırlayan (jeolog)": "Prepared by (geologist)", "Örneklemeyi yapan": "Sampled by", "Kontrol eden": "Checked by", "Ad soyad / imza / tarih": "Name / signature / date", "Andezit": "Andesite", "Bazalt": "Basalt", "Dasit": "Dacite", "Riyolit": "Rhyolite", "Trakit": "Trachyte", "Tüf": "Tuff", "Aglomera": "Agglomerate", "Volkanik breş": "Volcanic breccia", "Granit": "Granite", "Granodiyorit": "Granodiorite", "Kuvars monzonit": "Quartz monzonite", "Diyorit": "Diorite", "Gabro": "Gabbro", "Porfiri": "Porphyry", "Aplit/Pegmatit": "Aplite/Pegmatite", "Kumtaşı": "Sandstone", "Silttaşı": "Siltstone", "Çamurtaşı": "Mudstone", "Şeyl": "Shale", "Konglomera": "Conglomerate", "Kireçtaşı": "Limestone", "Dolomit": "Dolomite", "Mermer": "Marble", "Şist": "Schist", "Fillit": "Phyllite", "Gnays": "Gneiss", "Kuvarsit": "Quartzite", "Serpantinit": "Serpentinite", "Skarn": "Skarn", "Kuvars damarı": "Quartz vein", "Hidrotermal breş": "Hydrothermal breccia", "Jasperoid": "Jasperoid", "Gossan": "Gossan", "Fay zonu/kil": "Fault zone/clay", "Örtü/toprak": "Cover/soil", "Taze": "Fresh", "Silisleşme": "Silicification", "İleri arjilik": "Advanced argillic", "Arjilik": "Argillic", "Serisitik (fillik)": "Sericitic (phyllic)", "Potasik": "Potassic", "Propilitik": "Propylitic", "Kloritleşme": "Chloritisation", "Epidotlaşma": "Epidotisation", "Karbonatlaşma": "Carbonatisation", "Hematitleşme": "Hematisation", "Limonitleşme": "Limonitisation", "Skarnlaşma": "Skarn alteration", "Turmalinleşme": "Tourmalinisation", "Pirit": "Pyrite", "Kalkopirit": "Chalcopyrite", "Bornit": "Bornite", "Kovelin": "Covellite", "Kalkosin": "Chalcocite", "Galen": "Galena", "Sfalerit": "Sphalerite", "Arsenopirit": "Arsenopyrite", "Stibnit": "Stibnite", "Molibdenit": "Molybdenite", "Manyetit": "Magnetite", "Hematit": "Hematite", "Limonit/Götit": "Limonite/Goethite", "Malahit": "Malachite", "Azurit": "Azurite", "Görünür altın": "Visible gold", "Barit": "Barite", "Fluorit": "Fluorite", "0 – Yok": "0 – None", "1 – Zayıf": "1 – Weak", "2 – Orta": "2 – Moderate", "3 – Kuvvetli": "3 – Strong", "4 – Çok kuvvetli": "4 – Very strong", "Makaslama zonu": "Shear zone", "Kılavuz seviye": "Marker horizon", "Kayıp karot": "Core loss", "Boşluk / kavern": "Void / cavity", "Oksidasyon tabanı": "Base of oxidation", "Su seviyesi": "Water table", "Breş zonu": "Breccia zone", "Serisitik (fil": "Sericitic (phy", "Oksidasyon tab": "Base of oxid.", "Kaba blank": "Coarse blank", "Cu-Au porfiri standardı": "Cu-Au porphyry standard", "Çeyrek karot duplikatı": "Quarter-core duplicate", "Türkiye": "Türkiye", "Zambiya": "Zambia", "Botsvana": "Botswana", "Güney Afrika": "South Africa", "Namibya": "Namibia", "Mozambik": "Mozambique", "Malavi": "Malawi", "Tanzanya": "Tanzania", "Kenya": "Kenya", "Uganda": "Uganda", "Ruanda": "Rwanda", "Etiyopya": "Ethiopia", "Eritre": "Eritrea", "Sudan": "Sudan", "Mısır": "Egypt", "Fas": "Morocco", "Cezayir": "Algeria", "Tunus": "Tunisia", "Moritanya": "Mauritania", "Mali": "Mali", "Burkina Faso": "Burkina Faso", "Nijer": "Niger", "Nijerya": "Nigeria", "Gana": "Ghana", "Fildişi Sahili": "Côte d'Ivoire", "Gine": "Guinea", "Senegal": "Senegal", "Sierra Leone": "Sierra Leone", "Liberya": "Liberia", "Kamerun": "Cameroon", "DR Kongo": "DR Congo", "Kongo": "Congo", "Angola": "Angola", "Madagaskar": "Madagascar", "Suudi Arabistan": "Saudi Arabia", "Umman": "Oman", "İran": "Iran", "Irak": "Iraq", "Azerbaycan": "Azerbaijan", "Gürcistan": "Georgia", "Ermenistan": "Armenia", "Kazakistan": "Kazakhstan", "Özbekistan": "Uzbekistan", "Kırgızistan": "Kyrgyzstan", "Tacikistan": "Tajikistan", "Türkmenistan": "Turkmenistan", "Moğolistan": "Mongolia", "Afganistan": "Afghanistan", "Pakistan": "Pakistan", "Hindistan": "India", "Çin": "China", "Endonezya": "Indonesia", "Filipinler": "Philippines", "Papua Yeni Gine": "Papua New Guinea", "Avustralya": "Australia", "Rusya": "Russia", "Ukrayna": "Ukraine", "Sırbistan": "Serbia", "Bulgaristan": "Bulgaria", "Yunanistan": "Greece", "Romanya": "Romania", "Bosna-Hersek": "Bosnia and Herzegovina", "Kuzey Makedonya": "North Macedonia", "Arnavutluk": "Albania", "Kosova": "Kosovo", "Karadağ": "Montenegro", "Macaristan": "Hungary", "Polonya": "Poland", "Almanya": "Germany", "İspanya": "Spain", "Portekiz": "Portugal", "Finlandiya": "Finland", "İsveç": "Sweden", "Norveç": "Norway", "İrlanda": "Ireland", "Birleşik Krallık": "United Kingdom", "Kanada": "Canada", "ABD": "USA", "Meksika": "Mexico", "Peru": "Peru", "Şili": "Chile", "Arjantin": "Argentina", "Bolivya": "Bolivia", "Brezilya": "Brazil", "Kolombiya": "Colombia", "Ekvador": "Ecuador", "Guyana": "Guyana", "Fotoğraf (": "Photo (", "Fotoğraflar (": "Photos (", ")": ")"};
+I18N_EN={"Jeokimya": "Geochemistry", "Veri": "Data", "+ CSV içe aktar": "+ Import CSV", "CSV içe aktar": "Import CSV", "İçe aktar": "Import", "Veri seti adı": "Dataset name", "Örnek ortamı": "Sample medium", "Başlık satırı": "Header row", "Örnek no sütunu": "Sample no. column", "Tespit sınırı altı (<)": "Below detection limit (<)", "Sınırın yarısı (önerilen)": "Half the limit (recommended)", "Sınır değeri": "Limit value", "Boş bırak": "Leave empty", "Ondalık ayırıcı": "Decimal separator", "Nokta (0.5)": "Dot (0.5)", "Virgül (0,5)": "Comma (0,5)", "Koordinat kaynağı": "Coordinate source", "CSV’de UTM (WGS84) sütunları": "UTM (WGS84) columns in CSV", "CSV’de UTM (Arc 1950) sütunları": "UTM (Arc 1950) columns in CSV", "CSV’de enlem / boylam sütunları": "Latitude / longitude columns in CSV", "GEOLOOT örnek numaralarıyla eşleştir": "Match with GEOLOOT sample numbers", "Boylam sütunu": "Longitude column", "Enlem sütunu": "Latitude column", "Doğu (E) sütunu": "Easting (E) column", "Kuzey (N) sütunu": "Northing (N) column", "UTM zon": "UTM zone", "Element sütunları": "Element columns", "Önizleme": "Preview", "İstatistik": "Statistics", "Korelasyon": "Correlation", "Tematik harita": "Thematic map", "Anomaliler": "Anomalies", "Element": "Element", "Kayaç": "Rock", "Pearson (log10 dönüşümlü) – önerilen": "Pearson (log10-transformed) – recommended", "Spearman (sıra)": "Spearman (rank)", "Pearson (ham değer)": "Pearson (raw values)", "OpenStreetMap": "OpenStreetMap", "＋": "＋", "－": "－", "⤢": "⤢", "PNG": "PNG", "CSV": "CSV", "Min": "Min", "Max": "Max", "P75": "P75", "P90": "P90", "P95": "P95", "P98": "P98", "Yazma": "None", "Yeni gözlem oluştur": "Create new observation", "Mevcut gözleme ekle": "Add to existing observation", "Bağlı kayaç örneği": "Linked rock sample", "← Gözleme dön": "← Back to observation", "Ölçüm, seçtiğiniz saha gözlemine yapı tipine göre bir cümle olarak yazılır.": "The measurement is written to the chosen field observation as a sentence based on the structure type.", "Ölçümü düzenle": "Edit measurement", "✎ Düzenle": "✎ Edit", "Düzenle": "Edit", "Saha gözlemine yaz": "Write to field observation", "Yeni saha gözlemi oluştur": "Create new field observation", "Saha gözlemine yazma": "Don't write to an observation", "Konumu yenile": "Refresh position", "Konum bekleniyor…": "Waiting for position…", "Kayıtlı konum": "Saved position", "Kilitle": "Lock", "Kilidi aç": "Unlock", "← Ana ekran": "← Home", "Ölçümler": "Measurements", "Saha gözlemi": "Field observation", "Saha gözlemleri": "Field observations", "Gözlem": "Observation", "Örnekler": "Samples", "Yeni örnek": "New sample", "Yeni": "New", "Ölçüm": "Measure", "Sondaj": "Drilling", "Veritabanı": "Database", "Aktar / Ayar": "Export / Settings", "Aktar": "Export", "Saha defteri": "Field notebook", "⟵ Projeden çık": "⟵ Exit project", "← Geri": "← Back", "← Liste": "← List", "TR": "TR", "EN": "EN", "Jeolog saha aracı · örnek, gözlem, ölçüm ve sondaj kaydı": "Geologist's field tool · samples, observations, measurements and drill logs", "+ Yeni Proje": "+ New Project", "Yeni Proje": "New Project", "Yeni proje": "New project", "Yedekten proje aç (JSON)": "Open project from backup (JSON)", "Yedekten proje aç": "Open project from backup", "Deneme projesi oluştur": "Create demo project", "Projeler": "Projects", "Aç": "Open", "Projeyi sil": "Delete project", "GEO + TOOL (tersten LOOT)": "GEO + TOOL (LOOT reversed)", "veriler bu cihazda saklanır": "data is stored on this device", "Proje adı": "Project name", "Proje kodu": "Project code", "Ülke": "Country", "İl / eyalet / bölge": "Province / state / region", "İlçe / mevkii": "District / locality", "Ruhsat no": "Licence no.", "Şirket / müşteri": "Company / client", "Proje jeoloğu": "Project geologist", "Başlangıç tarihi": "Start date", "Açıklama": "Description", "Projeyi oluştur ve aç": "Create and open project", "Proje bilgileri": "Project details", "Proje bilgilerini düzenle": "Edit project details", "Proje kodu numune numaralarının başına gelir ({PRJ}). Ülke Zimbabve seçilirse Arc 1950 koordinatları otomatik açılır.": "The project code is used as the sample number prefix ({PRJ}). If Zimbabwe is selected as the country, Arc 1950 coordinates are switched on automatically.", "ör. Kocaçay Au-Cu arama projesi": "e.g. Kocaçay Au-Cu exploration project", "ör. KRB": "e.g. KRB", "Kaydet": "Save", "Vazgeç": "Cancel", "Sil": "Delete", "Evet": "Yes", "Kapat": "Close", "Tamam": "OK", "Ekle": "Add", "Güncelle": "Update", "Oluştur": "Create", "İndir": "Download", "Kopyala": "Copy", "Tümü": "All", "Tümünü seç": "Select all", "Sırala": "Sort", "Numara": "Number", "Tarih": "Date", "Saat": "Time", "Tip": "Type", "Durum": "Status", "Not": "Note", "Yok": "None", "Diğer": "Other", "Genel": "General", "Jeolog": "Geologist", "Konum": "Location", "Koordinat": "Coordinates", "Bilgi": "Info", "Kaynak": "Source", "Yüzey": "Surface", "Özet": "Summary", "Örnek listesi": "Sample list", "Toplam örnek": "Total samples", "Sediman": "Stream sed.", "Toprak": "Soil", "Kayaç": "Rock", "QC": "QC", "Laba gönderilmedi": "Not sent to lab", "+ Sediman": "+ Stream sed.", "+ Toprak": "+ Soil", "+ Kayaç": "+ Rock", "+ QC": "+ QC", "Ara: örnek no, litoloji, dere adı, not…": "Search: sample no., lithology, stream name, note…", "Örnek no": "Sample no.", "UTM E / N": "UTM E / N", "Filtreye uyan örnek yok.": "No samples match the filter.", "Henüz örnek yok. Yukarıdaki düğmelerle yeni örnek ekleyin.": "No samples yet. Add a new sample with the buttons above.", "Deneme verisi yükle": "Load demo data", "Arazide": "In field", "Gönderildi": "Sent", "Sonuç geldi": "Results received", "Laba gönderildi": "Sent to lab", "Örneği düzenle": "Edit sample", "Otomatik numarayı yeniden üret": "Regenerate automatic number", "Numara ayarlardaki biçime göre otomatik verilir; elle de değiştirebilirsiniz.": "The number is assigned automatically from the format in Settings; you can also change it manually.", "Dere sedimanı": "Stream sediment", "Dere sedimanı bilgileri": "Stream sediment details", "Toprak bilgileri": "Soil details", "Kayaç bilgileri": "Rock details", "QC (standart / blank / duplikat)": "QC (standard / blank / duplicate)", "QC (standart / blank / duplikat) bilgileri": "QC (standard / blank / duplicate) details", "Harici kamera foto no": "External camera photo no.", "Dere / kol adı": "Stream / tributary name", "Akış durumu": "Flow", "Aktif": "Active", "Zayıf akış": "Weak flow", "Durgun": "Stagnant", "Kuru": "Dry", "Dere genişliği": "Stream width", "Fraksiyon": "Fraction", "Ağır mineral (pan)": "Heavy mineral (pan)", "Malzeme": "Material", "Kum": "Sand", "Silt-kum": "Silt-sand", "Silt-kil": "Silt-clay", "Çakıllı kum": "Gravelly sand", "Organik": "Organic", "Havza litolojisi": "Catchment lithology", "Kirlilik riski": "Contamination risk", "Yol": "Road", "Yerleşim": "Settlement", "Tarım": "Agriculture", "Eski maden / cüruf": "Old mine / slag", "Ağırlık": "Weight", "Horizon": "Horizon", "Karışık": "Mixed", "Derinlik": "Depth", "Renk (Munsell)": "Colour (Munsell)", "Doku": "Texture", "Tınlı kum": "Loamy sand", "Tın": "Loam", "Siltli tın": "Silt loam", "Killi tın": "Clay loam", "Kil": "Clay", "Nem": "Moisture", "Nemli": "Moist", "Islak": "Wet", "Taşlılık": "Stoniness", "Rejolit": "Regolith", "Yerinde (residual)": "In situ (residual)", "Koluvyon": "Colluvium", "Alüvyon": "Alluvium", "Moloz / dolgu": "Debris / fill", "Arazi kullanımı": "Land use", "Orman": "Forest", "Mera": "Pasture", "Çıplak": "Bare", "Yerleşim yakını": "Near settlement", "Örnek tipi": "Sample type", "Mostra (outcrop)": "Outcrop", "Float (taşınmış)": "Float", "Chip": "Chip", "Kanal (channel)": "Channel", "Grab": "Grab", "Kompozit": "Composite", "Kanal / chip uzunluğu": "Channel / chip length", "Litoloji": "Lithology", "Alterasyon": "Alteration", "Alterasyon şiddeti": "Alteration intensity", "Cevherleşme": "Mineralisation", "Sülfit / cevher": "Sulphide / ore", "Damar (tip / kalınlık)": "Vein (type / thickness)", "QC tipi": "QC type", "Standart (CRM)": "Standard (CRM)", "Blank": "Blank", "Saha duplikatı": "Field duplicate", "Hazırlık duplikatı": "Preparation duplicate", "CRM / blank adı": "CRM / blank name", "Asıl örnek no (duplikat için)": "Original sample no. (for duplicates)", "Gönderim no": "Dispatch no.", "Açıklama / gözlem": "Description / observation", "Durum ve açıklama": "Status and description", "Fotoğraflar": "Photos", "Yapısal ölçümler": "Structural measurements", "Bu örneğe bağlı ölçüm yok.": "No measurements linked to this sample.", "+ Doğrultu / eğim ölçümü ekle": "+ Add strike / dip measurement", "Kaydet + yeni sediman": "Save + new stream sed.", "Kaydet + yeni toprak": "Save + new soil", "Kaydet + yeni kayaç": "Save + new rock", "Kaydet + yeni qc": "Save + new QC", "Duplikat oluştur": "Create duplicate", "Enlem": "Latitude", "Boylam": "Longitude", "GPS doğruluğu": "GPS accuracy", "Kot": "Elevation", "Zon": "Zone", "Yarıküre": "Hemisphere", "K – kuzey": "N – north", "G – güney": "S – south", "Doğu (E)": "Easting (E)", "Kuzey (N)": "Northing (N)", "WGS84 – coğrafi (enlem / boylam)": "WGS84 – geographic (lat / long)", "WGS84 – UTM": "WGS84 – UTM", "Arc 1950 – UTM": "Arc 1950 – UTM", "Zimbabve": "Zimbabwe", "Clarke 1880": "Clarke 1880", "(ondalık °)": "(decimal °)", "GPS ile konum al": "Get GPS position", "Konum kayıtlı": "Position saved", "Konum yok": "No position", "Uydu bekleniyor…": "Waiting for satellites…", "Durduruldu": "Stopped", "Bu cihazda GPS yok": "No GPS on this device", "Konum izni yok / bu pencerede kapalı": "No location permission / blocked in this window", "Konum alınamadı": "Position not available", "Herhangi bir sistemde girdiğiniz koordinat diğerlerine otomatik çevrilir.": "A coordinate entered in any system is converted to the others automatically.", "Arc 1950 değerleri yalnızca güney Afrika koordinatları için hesaplanır.": "Arc 1950 values are only computed for southern African coordinates.", "Kamera": "Camera", "Galeriden ekle": "Add from gallery", "Henüz fotoğraf yok.": "No photos yet.", "Bitti": "Done", "Foto no": "Photo no.", "foto": "photos", "Fotoğraf bu cihazda bulunamadı (başka cihazda çekilmiş olabilir).": "Photo not found on this device (it may have been taken on another device).", "konum yok": "no position", "Emin misiniz? Tekrar basın": "Are you sure? Tap again", "Silmek için tekrar basın": "Tap again to delete", "Fotoğraf": "Photo", "+ Yeni gözlem": "+ New observation", "+ İlk gözlemi ekle": "+ Add the first observation", "Henüz saha gözlemi yok.": "No field observations yet.", "Yeni saha gözlemi": "New field observation", "Gözlem no": "Observation no.", "Başlık": "Title", "Yorum ve gözlem": "Comments and observations", "Gözlem tipi": "Observation type", "Mostra": "Outcrop", "Litoloji kontağı": "Lithological contact", "Yapısal gözlem": "Structural observation", "Alterasyon zonu": "Alteration zone", "Eski işletme / galeri": "Old working / adit", "Anomali kontrolü": "Anomaly follow-up", "Erişim / lojistik": "Access / logistics", "Yorum": "Interpretation", "Öneri / yapılacaklar": "Recommendations / to do", "+ Doğrultu / eğim ölçümü": "+ Strike / dip measurement", "ör. Kocaçay güneyi silisli breş mostrası": "e.g. silicified breccia outcrop south of Kocaçay", "Doğrultu / eğim ölçümü": "Strike / dip measurement", "Eğim": "Dip", "Eğim yönü": "Dip direction", "Doğrultu (sağ el)": "Strike (RHR)", "Doğrultu": "Strike", "Sensörü başlat": "Start sensor", "Sensörü durdur": "Stop sensor", "Kilitle": "Lock", "Kilidi aç": "Unlock", "Telefonu ekranı yukarı bakacak şekilde ölçülecek yüzeye yatırın, değer oturunca “Kilitle”, sonra “Kaydet”.": "Lay the phone screen-up on the surface to be measured; when the reading settles press “Lock”, then “Save”.", "Ölçümü kaydet": "Save measurement", "Yapı tipi": "Structure type", "Tabaka": "Bedding", "Foliasyon": "Foliation", "Fay": "Fault", "Damar": "Vein", "Eklem": "Joint", "Kontak": "Contact", "Yöntem": "Method", "Elle": "Manual", "Telefon": "Phone", "Brunton / pusula": "Brunton / compass", "Bağlı örnek / gözlem": "Linked sample / observation", "Kayaç örnekleri": "Rock samples", "Konum al": "Get position", "Stereonet": "Stereonet", "(Schmidt, alt yarıküre)": "(Schmidt, lower hemisphere)", "Büyük daireler": "Great circles", "Ölçüm yok": "No measurements", "Henüz ölçüm yok.": "No measurements yet.", "Eğim / Eğim yönü": "Dip / Dip direction", "Sondaj kuyuları": "Drill holes", "+ Yeni kuyu": "+ New hole", "Yeni kuyu": "New hole", "Henüz kuyu yok. “+ Yeni kuyu” ile başlayın.": "No holes yet. Start with “+ New hole”.", "Kuyu bilgisi": "Hole info", "Kuyu bilgileri": "Hole details", "Kuyu başı (collar)": "Collar", "Kuyu adı": "Hole ID", "Saha / prospekt": "Area / prospect", "Planlandı": "Planned", "Devam ediyor": "In progress", "Tamamlandı": "Completed", "Terk": "Abandoned", "İlk numune no": "First sample no.", "Sondaj bilgileri": "Drilling details", "Azimut": "Azimuth", "Planlanan derinlik": "Planned depth", "Son derinlik (EOH)": "Final depth (EOH)", "Karot çapı": "Core size", "Sondaj firması / makine": "Drilling contractor / rig", "Başlangıç": "Start", "Bitiş": "End", "Loglayan jeolog": "Logged by", "Kuyuyu sil": "Delete hole", "ör. KRB-DH-001": "e.g. KRB-DH-001", "ör. KRB12001": "e.g. KRB12001", "Grafik log": "Graphic log", "Örnekleme listesi": "Sampling list", "Log tablosu": "Log table", "⚙ Sütunları düzenle": "⚙ Edit columns", "Aralık": "Interval", "Recovery": "Recovery", "RQD": "RQD", "Örnekleme": "Sampling", "numune": "sample", "m (≥10 cm parçalar)": "m (pieces ≥10 cm)", "Örnekle": "Sample", "+ Aralık ekle": "+ Add interval", "+ Öncekini kopyalayarak ekle": "+ Add copying previous", "Derinliğe göre sırala": "Sort by depth", "Aralığı sil": "Delete interval", "Henüz aralık yok. “+ Aralık ekle” ile başlayın.": "No intervals yet. Start with “+ Add interval”.", "Sıralandı": "Sorted", "Litoloji 1": "Lithology 1", "Litoloji 2": "Lithology 2", "Litoloji 3": "Lithology 3", "Marker": "Marker", "Alt. şiddeti": "Alt. intensity", "Cevher": "Ore", "Kırık sayısı": "Fracture count", "adet (doğal)": "count (natural)", "Kırık / m": "Fractures / m", "÷ recovery": "÷ recovery", "α açısı": "α angle", "β açısı": "β angle", "° (karot eksenine)": "° (to core axis)", "° (referans hattan)": "° (from reference line)", "Dayanım (ISRM)": "Strength (ISRM)", "Ayrışma (ISRM)": "Weathering (ISRM)", "Süreksizlik takımı": "Joint sets", "adet": "count", "Yüzey pürüzlülüğü": "Joint roughness", "Süreksizlik dolgusu": "Joint infill", "Çok pürüzlü": "Very rough", "Pürüzlü": "Rough", "Az pürüzlü": "Slightly rough", "Düz": "Smooth", "Kaygan / aynalı": "Slickensided", "Temiz": "Clean", "Kalsit": "Calcite", "Kuvars": "Quartz", "Limonit / oksit": "Limonite / oxide", "Klorit": "Chlorite", "Grafit": "Graphite", "Jips": "Gypsum", "Fay unu (gouge)": "Fault gouge", "W1 Taze": "W1 Fresh", "W2 Az ayrışmış": "W2 Slightly weathered", "W3 Orta ayrışmış": "W3 Moderately weathered", "W4 Çok ayrışmış": "W4 Highly weathered", "W5 Tamamen ayrışmış": "W5 Completely weathered", "W6 Rezidüel toprak": "W6 Residual soil", "Bölerek örnekle": "Split into samples", "Tek numune (tüm aralık)": "Single sample (whole interval)", "Numune boyu (m)": "Sample length (m)", "Yarım boydan kısa kalan son parçayı bir önceki numuneye ekle": "Add a last piece shorter than half a sample length to the previous sample", "Bu numuneleri sil": "Delete these samples", "Numune listesine git": "Go to sample list", "Numuneleri oluştur": "Create samples", "1 numune oluştur": "Create 1 sample", "Litoloji girilmemiş": "No lithology entered", "Log sütunları": "Log columns", "Sütun adı": "Column name", "CSV başlığı": "CSV header", "Seçenekler": "Options", "(virgülle)": "(comma-separated)", "Birim": "Unit", "Yukarı": "Up", "Aşağı": "Down", "Kaldır": "Remove", "+ Sütun ekle": "+ Add column", "Varsayılana dön": "Reset to default", "Yeni sütun": "New column", "From, To, Aralık, Recovery ve RQD sütunları sabittir. Diğer sütunları buradan ekleyebilir, yeniden adlandırabilir, sıralayabilir veya kaldırabilirsiniz. Sütun adı değişince mevcut veriler korunur. Bu ayar projedeki tüm kuyular için geçerlidir.": "The From, To, Interval, Recovery and RQD columns are fixed. Other columns can be added, renamed, reordered or removed here. Renaming a column keeps existing data. This setting applies to all holes in the project.", "Liste + serbest yazım": "List + free text", "Sabit liste": "Fixed list", "Metin": "Text", "Sayı": "Number", "Sütunlar kaydedildi": "Columns saved", "Numune": "Sample", "Numune no": "Sample no.", "Numune aralıkları": "Sample intervals", "Baş.": "From", "Bit.": "To", "Boy (m)": "Length (m)", "Boy": "Length", "Yarım karot": "Half core", "Çeyrek karot": "Quarter core", "Tüm karot": "Whole core", "RC kırıntı": "RC chips", "Yeni aralık": "New interval", "Aralığı düzenle": "Edit interval", "Toplu numune aralığı oluştur": "Create sample intervals in bulk", "(ör. 20–50 m arası her 1 m)": "(e.g. every 1 m from 20 to 50 m)", "Aralık uzunluğu (m)": "Interval length (m)", "Başlangıç (m)": "From (m)", "Bitiş (m)": "To (m)", "Yeni QA/QC örneği": "New QA/QC sample", "QC örneğini düzenle": "Edit QC sample", "QA/QC örnekleri": "QA/QC samples", "Referans (CRM adı / asıl numune no)": "Reference (CRM name / original sample no.)", "Referans": "Reference", "Başlangıç (duplikat için)": "From (for duplicates)", "Bitiş (duplikat için)": "To (for duplicates)", "Kaba red (coarse) duplikatı": "Coarse reject duplicate", "Pulp duplikatı": "Pulp duplicate", "Standart ve blank için CRM / blank adını, duplikat için asıl numune numarasını referansa yazın. Asıl numune seçilirse derinlikler otomatik doldurulur.": "For standards and blanks enter the CRM / blank name as reference; for duplicates enter the original sample number. Depths are filled in automatically when an original sample is selected.", "Survey": "Survey", "Yeni ölçüm": "New reading", "Collar (plan)": "Collar (planned)", "Gyro": "Gyro", "Reflex EZ-Shot": "Reflex EZ-Shot", "Multishot": "Multishot", "Kayıt yok.": "No records.", "Ölçek": "Scale", "Litoloji 1 · 2 · 3": "Lithology 1 · 2 · 3", "Cevher %": "Ore %", "Recovery / RQD": "Recovery / RQD", "rec": "rec", "Numuneler ve QA/QC örnekleri numara sırasıyla tek listede. Bu listeyi PDF olarak indirip örneklemeyi yapacak ekibe verebilirsiniz.": "Samples and QA/QC samples in a single list in number order. Download it as a PDF and hand it to the sampling crew.", "PDF indir": "Download PDF", "Excel (CSV)": "Excel (CSV)", "Yazdır": "Print", "Derinlikten (m)": "From depth (m)", "– boş: tümü": "– empty: all", "Derinliğe (m)": "To depth (m)", "Standart": "Standard", "Lab. duplikatı": "Lab duplicate", "Sıra": "No.", "Tür": "Kind", "Talimat": "Instruction", "Kesildi": "Cut", "Torbalandı": "Bagged", "Torba": "Bag", "Litoloji / not": "Lithology / note", "Listelenecek numune yok. Log sekmesinde “Örnekle” ile veya Numune sekmesinden numune ekleyin.": "No samples to list. Add samples with “Sample” in the Log tab or from the Sample tab.", "PDF kütüphanesi yüklenemedi": "PDF library could not be loaded", "Açılır pencere engellendi": "Pop-up blocked", "Örnek veritabanı": "Sample database", "Ara: numune no, kuyu, litoloji, tip…": "Search: sample no., hole, lithology, type…", "Yüzey QC": "Surface QC", "Sondaj numunesi": "Drill sample", "Sondaj QC": "Drill QC", "Seçilenleri sil": "Delete selected", "Seçimi temizle": "Clear selection", "Listeyi CSV indir": "Download list as CSV", "Filtreye uyan kayıt yok.": "No records match the filter.", "Konum / derinlik": "Location / depth", "Dışa aktarım ve ayarlar": "Export and settings", "Örnekler ve gözlemler": "Samples and observations", "Tüm örnekler (CSV)": "All samples (CSV)", "Yapısal ölçümler (CSV)": "Structural measurements (CSV)", "Saha gözlemleri (CSV)": "Field observations (CSV)", "Fotoğraf listesi (CSV)": "Photo list (CSV)", "Laboratuvar gönderim listesi": "Laboratory dispatch list", "Durumu “Arazide” olan örneklerden liste hazırlar, indirir ve bu örnekleri “Laba gönderildi” olarak işaretler.": "Builds a list from samples with status “In field”, downloads it and marks them as “Sent to lab”.", "Laboratuvar": "Laboratory", "ör. ALS İzmir": "e.g. ALS Izmir", "Gönderim listesini oluştur": "Create dispatch list", "Sondaj (Leapfrog / Micromine / Datamine tablo biçimi)": "Drilling (Leapfrog / Micromine / Datamine table format)", "(numune + QC, sıralı)": "(samples + QC, in order)", "Yedek": "Backup", "JSON yedek indir": "Download JSON backup", "fotoğrafları da ekle": "include photos", "Yedeği içe aktar": "Import backup", "Deneme verisi ekle": "Add demo data", "Tüm veriyi sil": "Delete all data", "Ayarlar": "Settings", "Varsayılan jeolog": "Default geologist", "Numara biçimi": "Number format", "— {PRJ} proje, {TIP} tip kodu, {YY} yıl, {NO} sıra": "— {PRJ} project, {TIP} type code, {YY} year, {NO} sequence", "Sıra no hane sayısı": "Sequence digits", "Ortak sıra (tüm tipler tek sayaç)": "Shared sequence (one counter for all types)", "Hayır – her tipin kendi sırası": "No – each type has its own sequence", "Evet – tek sayaç": "Yes – single counter", "Manyetik sapma": "Magnetic declination", "(°, doğu +)": "(°, east +)", "QC hatırlatma (her N örnekte)": "QC reminder (every N samples)", "Varsayılan UTM zon": "Default UTM zone", "CSV biçimi": "CSV format", "Standart (virgül, nokta ondalık)": "Standard (comma, dot decimal)", "Türkçe Excel (noktalı virgül, virgül ondalık)": "Turkish Excel (semicolon, comma decimal)", "Arc 1950 (Zimbabve) koordinatları": "Arc 1950 (Zimbabwe) coordinates", "Göster": "Show", "Gizle": "Hide", "Arc 1950 → WGS84 dönüşüm parametreleri": "Arc 1950 → WGS84 transformation parameters", "Örnek:": "Example:", "Ayarları kaydet": "Save settings", "Ayarlar kaydedildi": "Settings saved", "Zimbabve – EPSG:6906 (NGA 2014): −145, −97, −292 m": "Zimbabwe – EPSG:6906 (NGA 2014): −145, −97, −292 m", "Zimbabve – EPSG:1121 (DMA 1987): −142, −96, −293 m": "Zimbabwe – EPSG:1121 (DMA 1987): −142, −96, −293 m", "Arc 1950 ortalama – EPSG:1113: −143, −90, −294 m": "Arc 1950 mean – EPSG:1113: −143, −90, −294 m", "Zimbabve: UTM zon 35S (30°D batısı) veya 36S. Türkiye için manyetik sapma 2026’da yaklaşık +5° ile +6° arasıdır; çalışma alanınız için NOAA hesaplayıcısıyla kontrol edin.": "Zimbabwe: UTM zone 35S (west of 30°E) or 36S. Magnetic declination in Türkiye is roughly +5° to +6° in 2026; check your area with the NOAA calculator.", "Ortak": "Shared", "(cm)": "(cm)", "(kg)": "(kg)", "(m)": "(m)", "(° (aşağı −))": "(° (down −))", "° (aşağı −)": "° (down −)", "Örnek": "Example", "Bu kayıt silinsin mi?": "Delete this record?", "Ölçüm silinsin mi?": "Delete this measurement?", "Silindi": "Deleted", "Kopyalandı": "Copied", "Metni seçip kopyalayın": "Select the text and copy it", "Bu pencerede dosya indirilemedi": "The file could not be downloaded in this window", "Bu pencerede dosya indirilemedi. İçeriği kopyalayıp bir dosyaya yapıştırabilirsiniz.": "The file could not be downloaded in this window. You can copy the content and paste it into a file.", "TÜM örnekler, saha gözlemleri, fotoğraflar, ölçümler ve sondaj kayıtları silinecek. Önce JSON yedek aldınız mı?": "ALL samples, field observations, photos, measurements and drill records will be deleted. Have you made a JSON backup first?", "Hepsini sil": "Delete everything", "Veriler silindi": "Data deleted", "Yedek yüklendi": "Backup loaded", "Geçersiz yedek dosyası": "Invalid backup file", "Deneme verisi eklendi": "Demo data added", "İçe aktar": "Import", "Proje adı girin": "Enter a project name", "Proje bilgileri kaydedildi": "Project details saved", "Proje silindi": "Project deleted", "Gönderilecek örnek yok": "No samples to send", "Örnek no boş olamaz": "Sample no. cannot be empty", "Gözlem no boş olamaz": "Observation no. cannot be empty", "Numune no girin": "Enter a sample no.", "Kuyu adı girin": "Enter a hole ID", "Bu kuyu adı zaten var": "This hole ID already exists", "Kuyu kaydedildi": "Hole saved", "Derinlik girin": "Enter a depth", "Bitiş, başlangıçtan büyük olmalı": "To must be greater than From", "Başlangıç, bitiş ve uzunluk girin": "Enter from, to and length", "Eklendi": "Added", "Güncellendi": "Updated", "Önce bu aralığın From ve To değerlerini girin": "Enter From and To for this interval first", "Eğim (0–90°) ve eğim yönü/doğrultu girin": "Enter dip (0–90°) and dip direction/strike", "Sensör izni verilmedi": "Sensor permission denied", "Duplikat için QC kaydı açıldı": "QC record opened for the duplicate", "Fotoğraf kaydedilemedi": "Photo could not be saved", "Bu önizleme penceresi konuma izin vermiyor. Telefonda kurulu sürümde çalışır; şimdilik koordinatı elle girin.": "This preview window does not allow location access. It works in the installed phone version; enter the coordinate manually for now.", "Uygulama içi kamera bu pencerede açılamadı; cihazın kamerası açılıyor.": "The in-app camera could not open in this window; opening the device camera.", "⚠ Sensör verisi gelmiyor. Bu önizleme penceresi hareket/pusula sensörlerine izin vermiyor ya da cihazda sensör yok (PC). Uygulama telefonda HTTPS adresinden açıldığında çalışır. Şimdilik değerleri aşağıya elle girin.": "⚠ No sensor data. This preview window does not allow motion/compass sensors, or the device has none (PC). It works when the app is opened on a phone from an HTTPS address. Enter values manually below for now.", "🔒 Kilitli.": "🔒 Locked.", "Canlı ölçüm.": "Live reading.", "⚠ Pusula yönü göreli olabilir — eğim yönünü kontrol edin.": "⚠ Compass heading may be relative — check the dip direction.", "ÖRNEKLEME LİSTESİ": "SAMPLING LIST", "Hazırlayan (jeolog)": "Prepared by (geologist)", "Örneklemeyi yapan": "Sampled by", "Kontrol eden": "Checked by", "Ad soyad / imza / tarih": "Name / signature / date", "Andezit": "Andesite", "Bazalt": "Basalt", "Dasit": "Dacite", "Riyolit": "Rhyolite", "Trakit": "Trachyte", "Tüf": "Tuff", "Aglomera": "Agglomerate", "Volkanik breş": "Volcanic breccia", "Granit": "Granite", "Granodiyorit": "Granodiorite", "Kuvars monzonit": "Quartz monzonite", "Diyorit": "Diorite", "Gabro": "Gabbro", "Porfiri": "Porphyry", "Aplit/Pegmatit": "Aplite/Pegmatite", "Kumtaşı": "Sandstone", "Silttaşı": "Siltstone", "Çamurtaşı": "Mudstone", "Şeyl": "Shale", "Konglomera": "Conglomerate", "Kireçtaşı": "Limestone", "Dolomit": "Dolomite", "Mermer": "Marble", "Şist": "Schist", "Fillit": "Phyllite", "Gnays": "Gneiss", "Kuvarsit": "Quartzite", "Serpantinit": "Serpentinite", "Skarn": "Skarn", "Kuvars damarı": "Quartz vein", "Hidrotermal breş": "Hydrothermal breccia", "Jasperoid": "Jasperoid", "Gossan": "Gossan", "Fay zonu/kil": "Fault zone/clay", "Örtü/toprak": "Cover/soil", "Taze": "Fresh", "Silisleşme": "Silicification", "İleri arjilik": "Advanced argillic", "Arjilik": "Argillic", "Serisitik (fillik)": "Sericitic (phyllic)", "Potasik": "Potassic", "Propilitik": "Propylitic", "Kloritleşme": "Chloritisation", "Epidotlaşma": "Epidotisation", "Karbonatlaşma": "Carbonatisation", "Hematitleşme": "Hematisation", "Limonitleşme": "Limonitisation", "Skarnlaşma": "Skarn alteration", "Turmalinleşme": "Tourmalinisation", "Pirit": "Pyrite", "Kalkopirit": "Chalcopyrite", "Bornit": "Bornite", "Kovelin": "Covellite", "Kalkosin": "Chalcocite", "Galen": "Galena", "Sfalerit": "Sphalerite", "Arsenopirit": "Arsenopyrite", "Stibnit": "Stibnite", "Molibdenit": "Molybdenite", "Manyetit": "Magnetite", "Hematit": "Hematite", "Limonit/Götit": "Limonite/Goethite", "Malahit": "Malachite", "Azurit": "Azurite", "Görünür altın": "Visible gold", "Barit": "Barite", "Fluorit": "Fluorite", "0 – Yok": "0 – None", "1 – Zayıf": "1 – Weak", "2 – Orta": "2 – Moderate", "3 – Kuvvetli": "3 – Strong", "4 – Çok kuvvetli": "4 – Very strong", "Makaslama zonu": "Shear zone", "Kılavuz seviye": "Marker horizon", "Kayıp karot": "Core loss", "Boşluk / kavern": "Void / cavity", "Oksidasyon tabanı": "Base of oxidation", "Su seviyesi": "Water table", "Breş zonu": "Breccia zone", "Serisitik (fil": "Sericitic (phy", "Oksidasyon tab": "Base of oxid.", "Kaba blank": "Coarse blank", "Cu-Au porfiri standardı": "Cu-Au porphyry standard", "Çeyrek karot duplikatı": "Quarter-core duplicate", "Türkiye": "Türkiye", "Zambiya": "Zambia", "Botsvana": "Botswana", "Güney Afrika": "South Africa", "Namibya": "Namibia", "Mozambik": "Mozambique", "Malavi": "Malawi", "Tanzanya": "Tanzania", "Kenya": "Kenya", "Uganda": "Uganda", "Ruanda": "Rwanda", "Etiyopya": "Ethiopia", "Eritre": "Eritrea", "Sudan": "Sudan", "Mısır": "Egypt", "Fas": "Morocco", "Cezayir": "Algeria", "Tunus": "Tunisia", "Moritanya": "Mauritania", "Mali": "Mali", "Burkina Faso": "Burkina Faso", "Nijer": "Niger", "Nijerya": "Nigeria", "Gana": "Ghana", "Fildişi Sahili": "Côte d'Ivoire", "Gine": "Guinea", "Senegal": "Senegal", "Sierra Leone": "Sierra Leone", "Liberya": "Liberia", "Kamerun": "Cameroon", "DR Kongo": "DR Congo", "Kongo": "Congo", "Angola": "Angola", "Madagaskar": "Madagascar", "Suudi Arabistan": "Saudi Arabia", "Umman": "Oman", "İran": "Iran", "Irak": "Iraq", "Azerbaycan": "Azerbaijan", "Gürcistan": "Georgia", "Ermenistan": "Armenia", "Kazakistan": "Kazakhstan", "Özbekistan": "Uzbekistan", "Kırgızistan": "Kyrgyzstan", "Tacikistan": "Tajikistan", "Türkmenistan": "Turkmenistan", "Moğolistan": "Mongolia", "Afganistan": "Afghanistan", "Pakistan": "Pakistan", "Hindistan": "India", "Çin": "China", "Endonezya": "Indonesia", "Filipinler": "Philippines", "Papua Yeni Gine": "Papua New Guinea", "Avustralya": "Australia", "Rusya": "Russia", "Ukrayna": "Ukraine", "Sırbistan": "Serbia", "Bulgaristan": "Bulgaria", "Yunanistan": "Greece", "Romanya": "Romania", "Bosna-Hersek": "Bosnia and Herzegovina", "Kuzey Makedonya": "North Macedonia", "Arnavutluk": "Albania", "Kosova": "Kosovo", "Karadağ": "Montenegro", "Macaristan": "Hungary", "Polonya": "Poland", "Almanya": "Germany", "İspanya": "Spain", "Portekiz": "Portugal", "Finlandiya": "Finland", "İsveç": "Sweden", "Norveç": "Norway", "İrlanda": "Ireland", "Birleşik Krallık": "United Kingdom", "Kanada": "Canada", "ABD": "USA", "Meksika": "Mexico", "Peru": "Peru", "Şili": "Chile", "Arjantin": "Argentina", "Bolivya": "Bolivia", "Brezilya": "Brazil", "Kolombiya": "Colombia", "Ekvador": "Ecuador", "Guyana": "Guyana", "Fotoğraf (": "Photo (", "Fotoğraflar (": "Photos (", ")": ")"};
 
 const _pl=(n,one,many)=> (+n===1?one:many);
 I18N_RX=[
@@ -665,7 +668,8 @@ const NAV = [
   ['yeni','Yeni örnek','<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>','Yeni'],
   ['olcum','Ölçüm','<circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 12l4-6"/><path d="M5 17h14"/>','Ölçüm'],
   ['sondaj','Sondaj','<path d="M12 2v14"/><path d="M8 6h8"/><path d="M9 16h6l-3 6z"/>','Sondaj'],
-  ['veritabani','Veritabanı','<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/>','Veritabanı'],
+  ['veritabani','Veritabanı','<ellipse cx="12" cy="5.5" rx="7.5" ry="2.8"/><path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13"/><path d="M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8"/>','Veri'],
+  ['jeokimya','Jeokimya','<path d="M9 3h6"/><path d="M10 3v6.5L4.6 18.2A2 2 0 0 0 6.3 21h11.4a2 2 0 0 0 1.7-2.8L14 9.5V3"/><path d="M7.5 15h9"/>','Jeokimya'],
   ['aktar','Aktar / Ayar','<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 19h16"/>','Aktar']
 ];
 let _lgN=0;
@@ -686,7 +690,7 @@ function renderNav(){
     <div class="proj"><b>${esc(m.name||'')}</b>${esc([m.code, m.region, m.country].filter(Boolean).join(' · '))}
     <button class="btn exit" data-act="exitProj">⟵ Projeden çık</button></div>
     <div class="small" style="color:#9aa397;padding:0 12px 6px;text-transform:uppercase;letter-spacing:.8px;font-size:11px">Saha defteri</div>
-    ${NAV.map(([k,l,i])=>btn(k,l,i)).join('')}<div class="foot">GEOLOOT · v0.10</div>`;
+    ${NAV.map(([k,l,i])=>btn(k,l,i)).join('')}<div class="foot">GEOLOOT · v0.12</div>`;
 }
 function projTop(){ const m=curMeta()||{}; return `<div class="ptop">${LOGO_SVG(26)}<b>${esc(m.name||'')}</b><button data-act="exitProj">⟵ Projeden çık</button></div>`; }
 function go(v){ ui.view=v; if(location.hash.slice(1)!==v){ try{history.replaceState(null,'','#'+v);}catch(e){} } render(); window.scrollTo(0,0); }
@@ -701,7 +705,7 @@ function render(){
     afterRender(); return;
   }
   renderNav();
-  const V = {gozlem:viewObs, ornekler:viewSamples, yeni:viewSampleForm, olcum:viewClino, sondaj:viewDrill, veritabani:viewDB, aktar:viewExport, 'proje-bilgi':viewProjInfo}[ui.view] || viewSamples;
+  const V = {gozlem:viewObs, ornekler:viewSamples, yeni:viewSampleForm, olcum:viewClino, sondaj:viewDrill, veritabani:viewDB, jeokimya:viewGeochem, aktar:viewExport, 'proje-bilgi':viewProjInfo}[ui.view] || viewSamples;
   $('#main').innerHTML = projTop() + V();
   afterRender();
 }
@@ -758,15 +762,15 @@ let phDBp=null; const phMem=new Map(), phURL=new Map();
 let phCtx={rec:null, form:''};
 function idb(){
   if(phDBp) return phDBp;
-  phDBp=new Promise(res=>{ try{ const rq=indexedDB.open('sahaDefteriFoto',1);
-    rq.onupgradeneeded=()=>rq.result.createObjectStore('p',{keyPath:'id'});
+  phDBp=new Promise(res=>{ try{ const rq=indexedDB.open('sahaDefteriFoto',2);
+    rq.onupgradeneeded=()=>{ const db=rq.result; if(!db.objectStoreNames.contains('p')) db.createObjectStore('p',{keyPath:'id'}); if(!db.objectStoreNames.contains('gc')) db.createObjectStore('gc',{keyPath:'id'}); };
     rq.onsuccess=()=>res(rq.result); rq.onerror=()=>res(null); rq.onblocked=()=>res(null);
   }catch(e){ res(null); } });
   return phDBp;
 }
-async function phTx(mode, fn){
+async function phTx(mode, fn, store='p'){
   const db=await idb(); if(!db) throw new Error('idb');
-  return new Promise((res,rej)=>{ const tx=db.transaction('p',mode); let out; const rq=fn(tx.objectStore('p')); if(rq) rq.onsuccess=()=>{out=rq.result;}; tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); });
+  return new Promise((res,rej)=>{ const tx=db.transaction(store,mode); let out; const rq=fn(tx.objectStore(store)); if(rq) rq.onsuccess=()=>{out=rq.result;}; tx.oncomplete=()=>res(out); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error); });
 }
 async function phPut(o){ try{ await phTx('readwrite',st=>st.put(o)); }catch(e){ phMem.set(o.id,o); } }
 async function phGet(id){ if(phMem.has(id)) return phMem.get(id); try{ return await phTx('readonly',st=>st.get(id)); }catch(e){ return null; } }
@@ -917,7 +921,6 @@ function viewHome(){
       </div>
       <div class="row" style="justify-content:center;margin-top:12px;gap:8px">
         <label class="btn ghost sm" style="cursor:pointer">Yedekten proje aç (JSON)<input type="file" accept=".json,application/json" data-on="importProj" hidden></label>
-        <button class="btn ghost sm" data-act="demoProj">Deneme projesi oluştur</button>
       </div>
       ${installPrompt?`<div class="row" style="justify-content:center;margin-top:12px"><button class="btn ghost sm" data-act="install" style="border-color:#e08a5c;color:#e9b48a">📲 ${LG('Uygulamayı bu cihaza yükle','Install the app on this device')}</button></div>`:''}
     </div>
@@ -927,7 +930,7 @@ function viewHome(){
       <div style="min-width:0"><b>${esc(p.name)}</b><div class="meta">${esc([p.region,p.country].filter(Boolean).join(', ')||'—')}${p.license?' · '+esc(p.license):''}</div>
       <div class="meta">${st.s??0} örnek · ${st.o??0} gözlem · ${st.h??0} kuyu / ${st.d??0} sondaj numunesi · son: ${esc(p.updated||'')}</div></div>
       <div class="acts"><button class="btn acc sm" data-act="openProj" data-id="${p.id}">Aç</button><button class="btn ghost sm" data-act="delProj" data-id="${p.id}" title="Projeyi sil">✕</button></div></div>`; }).join('')}</div>`
-    :`<div class="empty">${LG('Henüz proje yok. <b>Yeni Proje</b> ile başlayın ya da denemek için <b>Deneme projesi oluştur</b>’a basın.','No projects yet. Start with <b>New Project</b>, or press <b>Create demo project</b> to try the app.')}</div>`}
+    :`<div class="empty">${LG('Henüz proje yok. <b>Yeni Proje</b> ile başlayın.','No projects yet. Start with <b>New Project</b>.')}</div>`}
     <div class="home-foot">${LG('Antibiotic tarafından yapay zeka desteği ile üretilmiştir.','Made by Antibiotic with the help of AI.')}<br>${LG('Veriler bu cihazda saklanır.','Data is stored on this device.')}</div>
   </div></div>`;
 }
@@ -976,18 +979,20 @@ function saveProject(form){
 async function deleteProject(id){
   const m=APP.projects.find(p=>p.id===id); if(!m) return;
   if(!await confirmBox(`“${m.name}” projesi ve içindeki TÜM veriler (örnekler, gözlemler, sondajlar, fotoğraflar) bu cihazdan silinecek. Önce yedek aldınız mı?`,'Projeyi sil')) return;
+  try{ for(const g of (projData(id).geochem||[])) await gcDel(g._u); }catch(_){}
   sdel(PKEY(id)); APP.projects=APP.projects.filter(p=>p.id!==id); if(APP.current===id) APP.current=null; saveApp();
   toast('Proje silindi'); render(); gcPhotos();
 }
 async function importProjectFile(file){
   try{
     const d=JSON.parse(await file.text()); if(!Array.isArray(d.samples)) throw 0;
-    const meta=d.project||{}; delete d.project; const pd=d.photoData; delete d.photoData;
+    const meta=d.project||{}; delete d.project; const pd=d.photoData; delete d.photoData; const gd=d.gcData; delete d.gcData;
     const data=normalize(d), id=uid();
     let name=meta.name||('İçe aktarılan proje ('+data.settings.prj+')');
     if(APP.projects.some(p=>p.name===name)) name+=' – kopya';
     APP.projects.push({...meta, id, name, code:data.settings.prj, created:meta.created||today(), updated:today(), stats:projStats(data)});
     sset(PKEY(id), JSON.stringify(data)); saveApp();
+    if(gd){ for(const [k,r] of Object.entries(gd)) await gcPut(k,r); }
     if(pd){ for(const [pid,u] of Object.entries(pd)){ try{ const full=dataURLToBlob(u); const {thumb}=await makePhotoBlobs(full); await phPut({id:pid, full, thumb}); }catch(_){} } }
     toast(`“${name}” projesi içe aktarıldı`); render();
   }catch(_){ toast('Geçersiz yedek dosyası','err'); }
@@ -1109,7 +1114,7 @@ function viewSamples(){
         <td data-l="Özet">${esc(summaryOf(s))||'<span class="muted">—</span>'}</td>
         <td data-l="Durum">${statusPill(s.durum)}</td></tr>`).join('')}
       </tbody></table></div>`
-    : `<div class="empty">${all.length?'Filtreye uyan örnek yok.':'Henüz örnek yok. Yukarıdaki düğmelerle yeni örnek ekleyin.<br><br><button class="btn ghost" data-act="demo">Deneme verisi yükle</button>'}</div>`}
+    : `<div class="empty">${all.length?'Filtreye uyan örnek yok.':'Henüz örnek yok. Yukarıdaki düğmelerle yeni örnek ekleyin.'}</div>`}
   </div>`;
 }
 function statusPill(d){
@@ -2106,6 +2111,504 @@ function sheetPDF(h){
   return doc.output('blob');
 }
 
+
+/* ===================== JEOKİMYA ===================== */
+const ELEMENTS=['H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr','Rb','Sr','Y','Zr','Nb','Mo','Ru','Rh','Pd','Ag','Cd','In','Sn','Sb','Te','I','Xe','Cs','Ba','La','Ce','Pr','Nd','Sm','Eu','Gd','Tb','Dy','Ho','Er','Tm','Yb','Lu','Hf','Ta','W','Re','Os','Ir','Pt','Au','Hg','Tl','Pb','Bi','Th','U'];
+const ELSET=new Set(ELEMENTS);
+const GC_MEDIA=['Dere sedimanı','Toprak','Kayaç','Sondaj','Diğer'];
+const UNIT_PPM={ppb:0.001, ppm:1, 'g/t':1, '%':10000, ppt:1e-6};
+const COORD_RX=/^(x|y|z|e|n|east|north|easting|northing|utm_?e|utm_?n|lat|lon|long|latitude|longitude|elev|elevation|rl|z_?m|doğu|kuzey|enlem|boylam|kot)$/i;
+const GC_PAL=['#3b6fb6','#8fc1de','#f2e48c','#f6a75a','#e4572e','#9e0a26'];
+const GC_RAD=[3.5,4.5,5.5,7,9,11];
+const GC_PCT=[50,75,90,95,98];
+const gcCache=new Map(), gcMem=new Map();
+
+/* ---- depolama (IndexedDB 'gc') ---- */
+async function gcPut(id, rows){ gcCache.set(id,rows); try{ await phTx('readwrite', st=>st.put({id, rows}), 'gc'); }catch(e){ gcMem.set(id,rows); } }
+async function gcGet(id){ if(gcCache.has(id)) return gcCache.get(id); if(gcMem.has(id)) return gcMem.get(id);
+  try{ const o=await phTx('readonly', st=>st.get(id), 'gc'); const r=o?o.rows:null; if(r) gcCache.set(id,r); return r; }catch(e){ return null; } }
+async function gcDel(id){ gcCache.delete(id); gcMem.delete(id); try{ await phTx('readwrite', st=>st.delete(id), 'gc'); }catch(e){} }
+
+/* ---- CSV ---- */
+function csvDetect(text){
+  const lines=text.split(/\r?\n/).slice(0,40).filter(l=>l.trim());
+  let best=',', bs=-1;
+  for(const d of [',',';','\t','|']){ const c=lines.map(l=>l.split(d).length); const m=c.sort((a,b)=>a-b)[Math.floor(c.length/2)]||0; if(m>bs){ bs=m; best=d; } }
+  return best;
+}
+function csvParse(text, d){
+  const rows=[]; let row=[], cur='', q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i];
+    if(q){ if(ch==='"'){ if(text[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=ch; }
+    else if(ch==='"') q=true;
+    else if(ch===d){ row.push(cur); cur=''; }
+    else if(ch==='\n'){ row.push(cur); rows.push(row); row=[]; cur=''; }
+    else if(ch!=='\r') cur+=ch;
+  }
+  if(cur!==''||row.length){ row.push(cur); rows.push(row); }
+  return rows.filter(r=>r.some(c=>String(c).trim()!==''));
+}
+function normUnit(u){ u=String(u||'').toLowerCase(); if(u==='mg/kg') return 'ppm'; if(u==='µg/kg'||u==='ug/kg') return 'ppb'; if(u==='pct') return '%'; if(u==='gpt') return 'g/t'; return u; }
+function parseElHeader(h){
+  const s=String(h||'').trim(); if(!s || COORD_RX.test(s)) return null;
+  const um=s.match(/(ppm|ppb|ppt|pct|%|g\/t|gpt|mg\/kg|µg\/kg|ug\/kg)/i);
+  const unit=um?normUnit(um[1]):'';
+  const ox=s.match(/^([A-Z][a-z]?)(\d?)O(\d?)(?=$|[\s_\-\(\[%])/);
+  if(ox && ELSET.has(ox[1]) && (ox[2]||ox[3]||ox[0].length>2)) return {el:ox[0], unit:unit||'%'};
+  const toks=s.split(/[\s_\-\.\(\)\[\]\/:,]+/).filter(Boolean);
+  for(const t of toks){
+    if(!/^[A-Za-z]{1,2}$/.test(t)) continue;
+    const c=t.charAt(0).toUpperCase()+t.slice(1).toLowerCase();
+    if(!ELSET.has(c)) continue;
+    if(t.length===1 && t!==t.toUpperCase()) continue;
+    if(t.length===2 && t===t.toLowerCase() && toks.length===1 && !unit) continue;
+    return {el:c, unit};
+  }
+  return null;
+}
+function parseGcVal(raw, dl, decComma){
+  if(raw==null) return {v:null};
+  let s=String(raw).trim(); if(!s || /^(-+|n\/?a|nss|is|lnr|nr|x|—|nd|null)$/i.test(s)) return {v:null};
+  if(decComma) s=s.replace(',', '.');
+  let bdl=false;
+  if(s[0]==='<'){ bdl=true; s=s.slice(1); } else if(s[0]==='>'){ s=s.slice(1); }
+  let x=parseFloat(s); if(isNaN(x)) return {v:null};
+  if(x<0){ bdl=true; x=Math.abs(x); }
+  if(bdl) return {v: dl==='half'? x/2 : dl==='dl'? x : null, bdl:true};
+  return {v:x};
+}
+const isNumCell = c => /^\s*[<>]?-?\d+([.,]\d+)?(e-?\d+)?\s*$/i.test(String(c||''));
+
+/* ---- içe aktarma sihirbazı ---- */
+function gcGuess(imp){
+  const R=imp.rows, H=R[imp.header]||[];
+  const find=rx=>H.findIndex(h=>rx.test(String(h).trim()));
+  let id=find(/^(sample|samp|örnek|numune|sample[_ ]?(id|no|number)|id|örnek[_ ]?no|numune[_ ]?no)/i); if(id<0) id=0;
+  const xe=find(/^(east|easting|utm_?e|x|e|doğu)$/i), yn=find(/^(north|northing|utm_?n|y|n|kuzey)$/i);
+  const la=find(/^(lat|latitude|enlem)/i), lo=find(/^(lon|long|longitude|boylam)/i);
+  imp.idCol=id;
+  if(la>=0&&lo>=0){ imp.coord='ll'; imp.xCol=lo; imp.yCol=la; }
+  else if(xe>=0&&yn>=0){ imp.coord='utm'; imp.xCol=xe; imp.yCol=yn; }
+  else { imp.coord='match'; imp.xCol=-1; imp.yCol=-1; }
+  const nx=R[imp.header+1]||[];
+  imp.unitRow = nx.filter(c=>/^\s*(ppm|ppb|ppt|pct|%|g\/t|gpt|mg\/kg|µg\/kg|ug\/kg)\s*$/i.test(c)).length>=2;
+  const data=R.slice(imp.header+1+(imp.unitRow?1:0), imp.header+60);
+  imp.els=H.map((h,i)=>{ if(i===id||i===imp.xCol||i===imp.yCol) return null; const p=parseElHeader(h); if(!p) return null; if(imp.unitRow){ const um=String(nx[i]||'').trim(); if(um) p.unit=normUnit(um); }
+    const num=data.filter(r=>isNumCell(r[i])).length; return num>=Math.min(3,data.length)*0.6 ? {col:i, el:p.el, unit:p.unit||'ppm', on:true} : null; }).filter(Boolean);
+}
+function gcStartImport(file){
+  const fr=new FileReader();
+  fr.onload=()=>{
+    let text=String(fr.result||''); if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
+    const delim=csvDetect(text), rows=csvParse(text, delim);
+    if(rows.length<2){ toast('CSV okunamadı','err'); return; }
+    let header=0, best=-1;
+    rows.slice(0,25).forEach((r,i)=>{ const sc=r.filter(c=>parseElHeader(c)).length*2 + (r.some(c=>/sample|örnek|numune/i.test(c))?3:0); if(sc>best){ best=sc; header=i; } });
+    const imp={file:file.name, name:file.name.replace(/\.(csv|txt)$/i,''), rows, delim, header, media:'Dere sedimanı', dl:'half', decComma:delim===';', zone:(()=>{ const c={}; DB.samples.forEach(x=>{ if(x.zone) c[x.zone]=(c[x.zone]||0)+1; }); const z=Object.keys(c).sort((a,b)=>c[b]-c[a])[0]; return z?+z:DB.settings.zone; })(), hem:(DB.samples.find(x=>x.hem)||{}).hem||'N', arc:false};
+    gcGuess(imp); ui.gcImp=imp; ui.gcView='import'; render();
+  };
+  fr.readAsText(file);
+}
+function gcBuildRows(imp){
+  const out=[], R=imp.rows.slice(imp.header+1+(imp.unitRow?1:0));
+  const sm=new Map(DB.samples.map(s=>[String(s.id).trim().toLowerCase(), s]));
+  R.forEach(r=>{
+    const id=String(r[imp.idCol]??'').trim(); if(!id) return;
+    const row={id, v:{}, bdl:[]};
+    if(imp.coord==='utm'||imp.coord==='arc'){
+      const E=num(String(r[imp.xCol]).replace(',','.')), N=num(String(r[imp.yCol]).replace(',','.'));
+      if(E!=null&&N!=null&&imp.zone){ const south=imp.hem==='S';
+        let ll = imp.coord==='arc' ? (()=>{ const a=fromUTM(+imp.zone,E,N,south,ELL.ARC); return arcToWgs(a.lat,a.lon); })() : fromUTM(+imp.zone,E,N,south);
+        row.lat=+ll.lat.toFixed(6); row.lon=+ll.lon.toFixed(6); row.E=E; row.N=N; }
+    } else if(imp.coord==='ll'){
+      const lo=num(String(r[imp.xCol]).replace(',','.')), la=num(String(r[imp.yCol]).replace(',','.'));
+      if(la!=null&&lo!=null){ row.lat=la; row.lon=lo; const u=toUTM(la,lo); row.E=+u.E.toFixed(1); row.N=+u.N.toFixed(1); }
+    } else {
+      const s=sm.get(id.toLowerCase()); if(s&&s.lat&&s.lon){ row.lat=+s.lat; row.lon=+s.lon; row.E=s.E?+s.E:null; row.N=s.N?+s.N:null; row.match=s.type; }
+    }
+    imp.els.filter(e=>e.on).forEach(e=>{ const p=parseGcVal(r[e.col], imp.dl, imp.decComma); if(p.v!=null) row.v[e.el]=p.v; if(p.bdl) row.bdl.push(e.el); });
+    if(!Object.keys(row.v).length && !row.bdl.length) return;
+    out.push(row);
+  });
+  return out;
+}
+async function gcDoImport(){
+  const imp=ui.gcImp; if(!imp) return;
+  if(!imp.els.some(e=>e.on)){ toast(LG('En az bir element sütunu seçin','Select at least one element column'),'err'); return; }
+  const rows=gcBuildRows(imp);
+  if(!rows.length){ toast(LG('Aktarılacak satır bulunamadı','No rows to import'),'err'); return; }
+  const u=uid(), els=imp.els.filter(e=>e.on).map(e=>({el:e.el, unit:e.unit}));
+  await gcPut(u, rows);
+  DB.geochem.push({_u:u, name:imp.name||imp.file, media:imp.media, date:today(), file:imp.file, n:rows.length, nxy:rows.filter(r=>r.lat!=null).length, els});
+  persist();
+  ui.gcImp=null; ui.gcView='main'; ui.gx.ds=[u]; ui.gx.key=null;
+  if(!ui.gx.el || !els.some(e=>e.el===ui.gx.el)) ui.gx.el=(els.find(e=>e.el==='Au')||els[0]).el;
+  toast(LG(`${rows.length} örnek, ${els.length} element içe aktarıldı`,`${rows.length} samples, ${els.length} elements imported`));
+  render();
+}
+function viewGcImport(){
+  const imp=ui.gcImp, H=imp.rows[imp.header]||[], data=imp.rows.slice(imp.header+1+(imp.unitRow?1:0));
+  const opt=(sel,inc)=>`${inc?'<option value="-1">—</option>':''}${H.map((h,i)=>`<option value="${i}" ${i===sel?'selected':''}>${i+1}. ${esc(String(h).slice(0,30)||'('+LG('boş','empty')+')')}</option>`).join('')}`;
+  const matchN = imp.coord==='match' ? (()=>{ const sm=new Set(DB.samples.map(s=>String(s.id).trim().toLowerCase())); return data.filter(r=>sm.has(String(r[imp.idCol]??'').trim().toLowerCase())).length; })() : 0;
+  const onN=imp.els.filter(e=>e.on).length;
+  return `<div class="topbar"><button class="btn ghost sm" data-act="gcCancel">←</button><h1>CSV içe aktar</h1><span class="muted small">${esc(imp.file)} · ${data.length} ${LG('satır','rows')}</span></div>
+  <form class="card" data-form="gcimp" autocomplete="off" onsubmit="return false">
+    <div class="grid">
+      <label class="fld"><span>Veri seti adı</span><input data-gci="name" value="${esc(imp.name)}"></label>
+      <label class="fld"><span>Örnek ortamı</span><select data-gci="media">${GC_MEDIA.map(m=>`<option ${m===imp.media?'selected':''}>${m}</option>`).join('')}</select></label>
+      <label class="fld"><span>Başlık satırı</span><select data-gci="header">${imp.rows.slice(0,25).map((r,i)=>`<option value="${i}" ${i===imp.header?'selected':''}>${i+1}. ${esc(r.slice(0,4).join(' | ').slice(0,40))}</option>`).join('')}</select></label>
+      <label class="fld"><span>Örnek no sütunu</span><select data-gci="idCol">${opt(imp.idCol)}</select></label>
+      <label class="fld"><span>Tespit sınırı altı (&lt;)</span><select data-gci="dl"><option value="half" ${imp.dl==='half'?'selected':''}>Sınırın yarısı (önerilen)</option><option value="dl" ${imp.dl==='dl'?'selected':''}>Sınır değeri</option><option value="null" ${imp.dl==='null'?'selected':''}>Boş bırak</option></select></label>
+      <label class="fld"><span>Ondalık ayırıcı</span><select data-gci="decComma"><option value="0" ${!imp.decComma?'selected':''}>Nokta (0.5)</option><option value="1" ${imp.decComma?'selected':''}>Virgül (0,5)</option></select></label>
+    </div>
+    <h3>Koordinat</h3>
+    <div class="grid">
+      <label class="fld"><span>Koordinat kaynağı</span><select data-gci="coord">
+        <option value="utm" ${imp.coord==='utm'?'selected':''}>CSV’de UTM (WGS84) sütunları</option>
+        ${DB.settings.showArc?`<option value="arc" ${imp.coord==='arc'?'selected':''}>CSV’de UTM (Arc 1950) sütunları</option>`:''}
+        <option value="ll" ${imp.coord==='ll'?'selected':''}>CSV’de enlem / boylam sütunları</option>
+        <option value="match" ${imp.coord==='match'?'selected':''}>GEOLOOT örnek numaralarıyla eşleştir</option></select></label>
+      ${imp.coord!=='match'?`<label class="fld"><span>${imp.coord==='ll'?'Boylam sütunu':'Doğu (E) sütunu'}</span><select data-gci="xCol">${opt(imp.xCol,true)}</select></label>
+      <label class="fld"><span>${imp.coord==='ll'?'Enlem sütunu':'Kuzey (N) sütunu'}</span><select data-gci="yCol">${opt(imp.yCol,true)}</select></label>`:''}
+      ${imp.coord==='utm'||imp.coord==='arc'?`<label class="fld"><span>UTM zon</span><input type="number" data-gci="zone" value="${esc(imp.zone)}"></label>
+      <label class="fld"><span>Yarıküre</span><select data-gci="hem"><option value="N" ${imp.hem!=='S'?'selected':''}>K – kuzey</option><option value="S" ${imp.hem==='S'?'selected':''}>G – güney</option></select></label>`:''}
+    </div>
+    ${imp.coord==='match'?`<p class="small" style="margin:8px 0 0">${LG(`Örnek numaraları bu projedeki yüzey örnekleriyle eşleştirilir: <b>${matchN}</b> / ${data.length} satır eşleşti.`,`Sample numbers are matched with surface samples in this project: <b>${matchN}</b> / ${data.length} rows matched.`)}</p>`:''}
+    <h3>Element sütunları (${onN})</h3>${imp.unitRow?`<p class="muted small" style="margin:-4px 0 8px">${LG('Başlığın altındaki satır birim satırı olarak algılandı ve birimler oradan alındı.','The row below the header was detected as a units row and units were taken from it.')}</p>`:''}
+    <div class="chips">${imp.els.map((e,i)=>`<label class="chip ${e.on?'on':''}"><input type="checkbox" data-gcel="${i}" ${e.on?'checked':''} style="width:15px;height:15px;min-height:0"> ${esc(e.el)} <span class="small" style="opacity:.7">${esc(e.unit)}</span></label>`).join('')||'<span class="muted">'+LG('Element sütunu bulunamadı. Başlık satırını kontrol edin.','No element columns found. Check the header row.')+'</span>'}</div>
+    <h3>Önizleme</h3>
+    <div class="tblwrap" style="max-height:260px;border:1px solid var(--line);border-radius:8px"><table style="font-size:12.5px"><thead><tr>${H.map((h,i)=>`<th style="${i===imp.idCol?'background:#fbeee3':imp.els.some(e=>e.col===i&&e.on)?'background:#e2ebe4':''}">${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${data.slice(0,8).map(r=>`<tr>${H.map((_,i)=>`<td>${esc(r[i]??'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+    <div class="row" style="margin-top:14px"><button type="button" class="btn acc big" data-act="gcDoImport">İçe aktar</button><button type="button" class="btn ghost" data-act="gcCancel">Vazgeç</button></div>
+  </form>`;
+}
+
+/* ---- veri hazırlama ---- */
+async function gcEnsure(){
+  const ids=ui.gx.ds.filter(u=>DB.geochem.some(d=>d._u===u));
+  const key=ids.join(',');
+  if(ui.gx.key===key && ui.gx.rows) return true;
+  const rows=[], els=[], unit={};
+  for(const u of ids){
+    const meta=DB.geochem.find(d=>d._u===u), R=await gcGet(u)||[];
+    meta.els.forEach(e=>{ if(!(e.el in unit)){ unit[e.el]=e.unit; els.push(e.el); } });
+    const f={}; meta.els.forEach(e=>{ f[e.el]=(UNIT_PPM[e.unit]||1)/(UNIT_PPM[unit[e.el]]||1); });
+    R.forEach(r=>{ const v={}; for(const k in r.v) v[k]=r.v[k]*(f[k]||1); rows.push({...r, v, ds:meta.name, media:meta.media}); });
+  }
+  ui.gx.rows=rows; ui.gx.els=els; ui.gx.unit=unit; ui.gx.key=key; ui.gx.corr=null;
+  return true;
+}
+const gcVals = (el, pos) => ui.gx.rows.map(r=>r.v[el]).filter(v=>v!=null && (!pos || v>0));
+function pctl(sorted, p){ if(!sorted.length) return null; const i=(sorted.length-1)*p/100, lo=Math.floor(i), hi=Math.ceil(i); return sorted[lo]+(sorted[hi]-sorted[lo])*(i-lo); }
+function gcStats(el){
+  const a=gcVals(el).sort((x,y)=>x-y), nb=ui.gx.rows.filter(r=>r.bdl&&r.bdl.includes(el)).length;
+  if(!a.length) return {el, n:0, nb};
+  const pos=a.filter(v=>v>0), gm=pos.length?Math.pow(10, pos.reduce((s,v)=>s+Math.log10(v),0)/pos.length):null;
+  return {el, n:a.length, nb, min:a[0], max:a[a.length-1], mean:a.reduce((s,v)=>s+v,0)/a.length, gmean:gm, p50:pctl(a,50), p75:pctl(a,75), p90:pctl(a,90), p95:pctl(a,95), p98:pctl(a,98)};
+}
+function fmtv(v){ if(v==null||isNaN(v)) return '—'; const a=Math.abs(v); if(a===0) return '0'; if(a>=1000) return v.toFixed(0); if(a>=100) return v.toFixed(1); if(a>=1) return v.toFixed(2); if(a>=0.01) return v.toFixed(3); return v.toPrecision(2); }
+
+/* ---- korelasyon ---- */
+function rankArr(a){ const idx=a.map((v,i)=>[v,i]).filter(x=>x[0]!=null).sort((x,y)=>x[0]-y[0]); const r=new Array(a.length).fill(null);
+  for(let i=0;i<idx.length;){ let j=i; while(j+1<idx.length && idx[j+1][0]===idx[i][0]) j++; const rk=(i+j)/2+1; for(let k=i;k<=j;k++) r[idx[k][1]]=rk; i=j+1; } return r; }
+function pearson(a,b){ let n=0,sa=0,sb=0,saa=0,sbb=0,sab=0; for(let k=0;k<a.length;k++){ const x=a[k], y=b[k]; if(x==null||y==null) continue; n++; sa+=x; sb+=y; saa+=x*x; sbb+=y*y; sab+=x*y; }
+  if(n<5) return {r:null,n}; const cov=sab-sa*sb/n, va=saa-sa*sa/n, vb=sbb-sb*sb/n; return {r:(va>0&&vb>0)?cov/Math.sqrt(va*vb):null, n}; }
+function gcCorr(){
+  const m=ui.gx.method||'log';
+  if(ui.gx.corr && ui.gx.corr.m===m) return ui.gx.corr;
+  const els=ui.gx.els.filter(e=>gcVals(e,true).length>=5);
+  let X=els.map(e=>ui.gx.rows.map(r=>{ const v=r.v[e]; return (v==null||!(v>0))?null:(m==='log'?Math.log10(v):v); }));
+  if(m==='spearman') X=X.map(rankArr);
+  const R={}; els.forEach((a,i)=>{ R[a]={}; els.forEach((b,j)=>{ if(j<i) R[a][b]=R[b][a]; else if(i===j) R[a][b]={r:1,n:X[i].filter(v=>v!=null).length}; else R[a][b]=pearson(X[i],X[j]); }); });
+  ui.gx.corr={m, els, R}; return ui.gx.corr;
+}
+const ASSOC=[
+  {s:['Au','As','Sb'], tr:'Au–As–Sb: epitermal veya orojenik altın sistemlerinin tipik iz (pathfinder) elementleri.', en:'Au–As–Sb: typical pathfinder elements of epithermal or orogenic gold systems.'},
+  {s:['Au','Hg','Tl'], tr:'Au–Hg–Tl(–Sb–As): sığ epitermal veya Carlin tipi altın sistemlerine işaret edebilir.', en:'Au–Hg–Tl(–Sb–As): may point to shallow epithermal or Carlin-type gold systems.'},
+  {s:['Au','Cu','Mo'], tr:'Au–Cu–Mo: porfiri Cu-Au(-Mo) sistemlerinin karakteristik birlikteliği.', en:'Au–Cu–Mo: characteristic association of porphyry Cu-Au(-Mo) systems.'},
+  {s:['Au','Bi','Te'], tr:'Au–Bi–Te(–W): intrüzyonla ilişkili altın veya skarn sistemleri.', en:'Au–Bi–Te(–W): intrusion-related gold or skarn systems.'},
+  {s:['Au','Ag','Pb','Zn'], tr:'Au–Ag–Pb–Zn: ortaç sülfidasyonlu epitermal ya da baz metal damar sistemleri.', en:'Au–Ag–Pb–Zn: intermediate-sulphidation epithermal or base-metal vein systems.'},
+  {s:['Cu','Mo','Re'], tr:'Cu–Mo(–Re): porfiri sistemi çekirdeği.', en:'Cu–Mo(–Re): porphyry system core.'},
+  {s:['Pb','Zn','Ag','Cd'], tr:'Pb–Zn–Ag–Cd: karbonat ya da sedimanter barındırılı baz metal (MVT/SEDEX) veya damar tipi.', en:'Pb–Zn–Ag–Cd: carbonate/sediment-hosted base metal (MVT/SEDEX) or vein type.'},
+  {s:['Sn','W','Bi'], tr:'Sn–W(–Bi): granitle ilişkili greisen / damar sistemleri.', en:'Sn–W(–Bi): granite-related greisen / vein systems.'},
+  {s:['Ni','Cr','Co'], tr:'Ni–Cr–Co: ultramafik kayaç kaynaklı (ofiyolit, laterit) imza.', en:'Ni–Cr–Co: ultramafic-derived signature (ophiolite, laterite).'}
+];
+function assocHints(t, R){
+  const out=[];
+  ASSOC.forEach(a=>{ if(!a.s.includes(t)) return; const o=a.s.filter(e=>e!==t && R[t] && R[t][e] && R[t][e].r!=null); if(o.length<Math.min(2,a.s.length-1)) return;
+    const mean=o.reduce((s,e)=>s+R[t][e].r,0)/o.length; if(mean>=0.4) out.push({txt:LG(a.tr,a.en), r:mean, els:o}); });
+  ['Fe','Mn'].forEach(e=>{ if(e!==t && R[t]&&R[t][e]&&R[t][e].r>=0.5) out.push({txt:LG(`${t}–${e} korelasyonu yüksek (r=${R[t][e].r.toFixed(2)}): özellikle dere sedimanı ve toprakta bu, Fe-Mn oksitlerin metalleri tutmasından (sekonder zenginleşme) kaynaklanıyor olabilir; anomalileri değerlendirirken dikkate alın.`,`High ${t}–${e} correlation (r=${R[t][e].r.toFixed(2)}): especially in stream sediments and soils this may reflect scavenging by Fe-Mn oxides (secondary enrichment); keep this in mind when assessing anomalies.`), r:R[t][e].r, warn:true}); });
+  return out.sort((a,b)=>b.r-a.r);
+}
+const rColor = r => { if(r==null) return '#f1eee6'; const a=Math.min(1,Math.abs(r)); return r>=0 ? `rgba(196,57,32,${0.08+a*0.9})` : `rgba(43,111,158,${0.08+a*0.9})`; };
+function corrRankSVG(t, C){
+  const L=C.els.filter(e=>e!==t && C.R[t][e].r!=null).map(e=>({e, r:C.R[t][e].r, n:C.R[t][e].n})).sort((a,b)=>b.r-a.r);
+  if(!L.length) return '<p class="muted">'+LG('Korelasyon hesaplamak için yeterli veri yok (en az 5 ortak örnek gerekir).','Not enough data to compute correlations (at least 5 common samples needed).')+'</p>';
+  const W=560, rh=20, H=L.length*rh+30, x0=60, mid=x0+(W-x0-60)/2, sc=(W-x0-60)/2;
+  let g=`<line x1="${mid}" x2="${mid}" y1="10" y2="${H-14}" stroke="#999"/>`;
+  [-1,-0.5,0.5,1].forEach(v=>{ const x=mid+v*sc; g+=`<line x1="${x}" x2="${x}" y1="10" y2="${H-14}" stroke="#e6e0d2"/><text x="${x}" y="${H-2}" font-size="10" text-anchor="middle" fill="#777">${v}</text>`; });
+  L.forEach((o,i)=>{ const y=14+i*rh, x=o.r>=0?mid:mid+o.r*sc, w=Math.abs(o.r)*sc;
+    g+=`<text x="${x0-8}" y="${y+12}" font-size="12" font-weight="700" text-anchor="end">${esc(o.e)}</text><rect x="${x}" y="${y+2}" width="${Math.max(1,w)}" height="${rh-6}" rx="2" fill="${rColor(o.r)}" stroke="${o.r>=0?'#a83a1e':'#2b6f9e'}" stroke-width=".6"/><text x="${o.r>=0?x+w+4:x-4}" y="${y+12}" font-size="10.5" text-anchor="${o.r>=0?'start':'end'}" fill="#333">${o.r.toFixed(2)} <tspan fill="#999">n=${o.n}</tspan></text>`; });
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto">${g}</svg>`;
+}
+function corrMatrixSVG(C, t){
+  let els=C.els.slice(); if(t && C.R[t]) els.sort((a,b)=>(a===t?-2:(C.R[t][b].r??-2))-(b===t?-2:(C.R[t][a].r??-2))); if(t){ els=els.filter(e=>e!==t); els.unshift(t); }
+  const n=els.length, cs=Math.max(14, Math.min(28, Math.floor(620/(n+1)))), off=38, W=off+n*cs+2;
+  let g='';
+  els.forEach((a,i)=>{ g+=`<text x="${off+i*cs+cs/2}" y="${off-6}" font-size="${Math.min(11,cs*0.5)}" text-anchor="middle" font-weight="700">${esc(a)}</text><text x="${off-5}" y="${off+i*cs+cs*0.65}" font-size="${Math.min(11,cs*0.5)}" text-anchor="end" font-weight="700">${esc(a)}</text>`;
+    els.forEach((b,j)=>{ const c=C.R[a][b]; g+=`<rect x="${off+j*cs}" y="${off+i*cs}" width="${cs-1}" height="${cs-1}" fill="${rColor(c&&c.r)}" data-act="gcPair" data-a="${esc(a)}" data-b="${esc(b)}" style="cursor:pointer"><title>${esc(a)}–${esc(b)}: r=${c&&c.r!=null?c.r.toFixed(2):'—'} (n=${c?c.n:0})</title></rect>`;
+      if(cs>=24 && c && c.r!=null && i!==j) g+=`<text x="${off+j*cs+cs/2}" y="${off+i*cs+cs*0.62}" font-size="8.5" text-anchor="middle" fill="${Math.abs(c.r)>0.6?'#fff':'#333'}" pointer-events="none">${c.r.toFixed(1)}</text>`; }); });
+  return `<svg viewBox="0 0 ${W} ${W}" style="width:100%;max-width:${W}px;height:auto">${g}</svg>`;
+}
+function scatterSVG(a, b){
+  const P=ui.gx.rows.filter(r=>r.v[a]>0 && r.v[b]>0).map(r=>[r.v[a], r.v[b], r.id]);
+  if(P.length<3) return '<p class="muted">'+LG('Yeterli ortak veri yok.','Not enough common data.')+'</p>';
+  const W=420,H=320,m={l:52,r:12,t:12,b:40}, lx=P.map(p=>Math.log10(p[0])), ly=P.map(p=>Math.log10(p[1]));
+  const ext=a=>{ let lo=Math.min(...a), hi=Math.max(...a); if(hi-lo<0.5){ lo-=0.25; hi+=0.25; } return [Math.floor(lo*2)/2, Math.ceil(hi*2)/2]; };
+  const [x0,x1]=ext(lx), [y0,y1]=ext(ly), X=v=>m.l+(v-x0)/(x1-x0)*(W-m.l-m.r), Y=v=>H-m.b-(v-y0)/(y1-y0)*(H-m.t-m.b);
+  let g=`<rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}" fill="#fff" stroke="#ccc"/>`;
+  for(let v=Math.ceil(x0);v<=x1;v++) g+=`<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${H-m.b}" stroke="#eee"/><text x="${X(v)}" y="${H-m.b+14}" font-size="10" text-anchor="middle">${fmtv(Math.pow(10,v))}</text>`;
+  for(let v=Math.ceil(y0);v<=y1;v++) g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="#eee"/><text x="${m.l-5}" y="${Y(v)+3}" font-size="10" text-anchor="end">${fmtv(Math.pow(10,v))}</text>`;
+  P.forEach((p,i)=>{ g+=`<circle cx="${X(lx[i]).toFixed(1)}" cy="${Y(ly[i]).toFixed(1)}" r="3.2" fill="#b4532a" fill-opacity=".55" stroke="#7a2f12" stroke-width=".4"><title>${esc(p[2])}: ${esc(a)} ${fmtv(p[0])}, ${esc(b)} ${fmtv(p[1])}</title></circle>`; });
+  const {r}=pearson(lx,ly); const n=lx.length, mx=lx.reduce((s,v)=>s+v,0)/n, my=ly.reduce((s,v)=>s+v,0)/n;
+  let sxy=0,sxx=0; lx.forEach((v,i)=>{ sxy+=(v-mx)*(ly[i]-my); sxx+=(v-mx)**2; }); const k=sxx?sxy/sxx:0;
+  g+=`<line x1="${X(x0)}" y1="${Y(my+k*(x0-mx))}" x2="${X(x1)}" y2="${Y(my+k*(x1-mx))}" stroke="#26302a" stroke-width="1.3" stroke-dasharray="5 3" clip-path="url(#scClip)"/>`;
+  g+=`<text x="${(m.l+W-m.r)/2}" y="${H-6}" font-size="11.5" text-anchor="middle" font-weight="700">${esc(a)} (${esc(ui.gx.unit[a]||'')}, log)</text><text transform="translate(12 ${(m.t+H-m.b)/2}) rotate(-90)" font-size="11.5" text-anchor="middle" font-weight="700">${esc(b)} (${esc(ui.gx.unit[b]||'')}, log)</text>`;
+  g+=`<text x="${m.l+8}" y="${m.t+16}" font-size="12" font-weight="700">r = ${r!=null?r.toFixed(2):'—'} · n = ${n}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto"><defs><clipPath id="scClip"><rect x="${m.l}" y="${m.t}" width="${W-m.l-m.r}" height="${H-m.t-m.b}"/></clipPath></defs>${g}</svg>`;
+}
+
+/* ---- ana görünüm ---- */
+function gcDefaults(){ ui.gx=ui.gx||{ds:[], el:'Au', tab:'corr', method:'log', pair:null, idw:true, base:'none', labels:true, thr:95}; }
+function viewGeochem(){
+  gcDefaults();
+  if(ui.gcView==='import' && ui.gcImp) return viewGcImport();
+  const DS=DB.geochem;
+  ui.gx.ds=ui.gx.ds.filter(u=>DS.some(d=>d._u===u)); if(!ui.gx.ds.length && DS.length) ui.gx.ds=[DS[DS.length-1]._u];
+  const head=`<div class="topbar"><h1>Jeokimya</h1>
+    <label class="btn acc" style="cursor:pointer">+ CSV içe aktar<input type="file" accept=".csv,.txt,text/csv" data-on="gcFile" hidden></label></div>`;
+  if(!DS.length) return head+`<div class="card empty">${LG('Henüz jeokimya verisi yok. Laboratuvar sonuçlarını (kayaç, dere sedimanı, toprak…) CSV olarak içe aktarın. Element sütunları ve birimleri otomatik tanınır.','No geochemistry data yet. Import laboratory results (rock, stream sediment, soil…) as CSV. Element columns and units are recognised automatically.')}</div>`;
+  const key=ui.gx.ds.join(',');
+  if(ui.gx.key!==key || !ui.gx.rows){ gcEnsure().then(()=>{ if(ui.view==='jeokimya') render(); }); return head+'<div class="card empty">'+LG('Veriler yükleniyor…','Loading data…')+'</div>'; }
+  if(!ui.gx.els.includes(ui.gx.el)) ui.gx.el=ui.gx.els.includes('Au')?'Au':ui.gx.els[0];
+  const t=ui.gx.el, tabs=[['stats','İstatistik'],['corr','Korelasyon'],['map','Tematik harita'],['anom','Anomaliler']];
+  const elSel=`<label class="fld" style="max-width:170px"><span>Element</span><select data-on="gcEl">${ui.gx.els.map(e=>`<option value="${esc(e)}" ${e===t?'selected':''}>${esc(e)} (${esc(ui.gx.unit[e])})</option>`).join('')}</select></label>`;
+  let body='';
+  if(ui.gx.tab==='stats') body=gcStatsView();
+  else if(ui.gx.tab==='corr') body=gcCorrView(t, elSel);
+  else if(ui.gx.tab==='map') body=gcMapView(t, elSel);
+  else body=gcAnomView(t, elSel);
+  const nXY=ui.gx.rows.filter(r=>r.lat!=null).length;
+  return head+`<div class="card">
+    <div class="row" style="justify-content:space-between"><b>${LG('Veri setleri','Datasets')}</b><span class="muted small">${ui.gx.rows.length} ${LG('örnek','samples')} · ${ui.gx.els.length} element · ${nXY} ${LG('koordinatlı','with coordinates')}</span></div>
+    <div class="chips" style="margin:8px 0 0">${DS.map(d=>`<span class="chip ${ui.gx.ds.includes(d._u)?'on':''}" data-act="gcDs" data-u="${d._u}">${esc(d.name)} <span class="small" style="opacity:.7">${esc(d.media)} · ${d.n}</span><button class="gcx" data-act="gcDelDs" data-u="${d._u}" title="${LG('Veri setini sil','Delete dataset')}">✕</button></span>`).join('')}</div>
+    ${ui.gx.ds.length>1 && new Set(DS.filter(d=>ui.gx.ds.includes(d._u)).map(d=>d.media)).size>1?`<div class="warns">⚠ ${LG('Farklı örnek ortamları (ör. kayaç ve dere sedimanı) birlikte seçili. İstatistik ve eşik değerler için ortamları ayrı değerlendirmeniz önerilir.','Different sample media (e.g. rock and stream sediment) are selected together. Assess media separately for statistics and thresholds.')}</div>`:''}
+  </div>
+  <div class="tabs">${tabs.map(([k,l])=>`<button class="${ui.gx.tab===k?'on':''}" data-act="gcTab" data-t="${k}">${l}</button>`).join('')}</div>
+  ${body}`;
+}
+function gcStatsView(){
+  const S=ui.gx.els.map(gcStats);
+  return `<div class="card"><h2>${LG('Özet istatistik','Summary statistics')}</h2>
+  <div class="tblwrap"><table class="sheet" style="font-size:13px"><thead><tr><th>Element</th><th>${LG('Birim','Unit')}</th><th>n</th><th>&lt;DL</th><th>Min</th><th>${LG('Medyan','Median')}</th><th>${LG('Geo. ort.','Geo. mean')}</th><th>P75</th><th>P90</th><th>P95</th><th>P98</th><th>Max</th></tr></thead>
+  <tbody>${S.map(s=>`<tr class="click" data-act="gcPick" data-e="${esc(s.el)}"><td><b>${esc(s.el)}</b></td><td>${esc(ui.gx.unit[s.el])}</td><td>${s.n}</td><td>${s.nb||''}</td><td>${fmtv(s.min)}</td><td>${fmtv(s.p50)}</td><td>${fmtv(s.gmean)}</td><td>${fmtv(s.p75)}</td><td>${fmtv(s.p90)}</td><td>${fmtv(s.p95)}</td><td>${fmtv(s.p98)}</td><td>${fmtv(s.max)}</td></tr>`).join('')}</tbody></table></div>
+  <p class="muted small" style="margin:8px 0 0">${LG('Tespit sınırı altı değerler içe aktarmada seçilen kurala göre hesaplanır. Bir satıra tıklayınca o element seçilir.','Below-detection values are handled by the rule chosen at import. Click a row to select that element.')}</p></div>`;
+}
+function gcCorrView(t, elSel){
+  const C=gcCorr(); if(!C.R[t]) return `<div class="card">${elSel}<p class="muted">${LG('Bu element için yeterli veri yok.','Not enough data for this element.')}</p></div>`;
+  const pair = ui.gx.pair && ui.gx.pair!==t && C.R[t][ui.gx.pair] ? ui.gx.pair : (C.els.filter(e=>e!==t && C.R[t][e].r!=null).sort((a,b)=>C.R[t][b].r-C.R[t][a].r)[0]);
+  const hints=assocHints(t, C.R);
+  return `<div class="card"><div class="row" style="align-items:flex-end">${elSel}
+    <label class="fld" style="max-width:260px"><span>${LG('Yöntem','Method')}</span><select data-on="gcMethod"><option value="log" ${ui.gx.method==='log'?'selected':''}>Pearson (log10 dönüşümlü) – önerilen</option><option value="spearman" ${ui.gx.method==='spearman'?'selected':''}>Spearman (sıra)</option><option value="lin" ${ui.gx.method==='lin'?'selected':''}>Pearson (ham değer)</option></select></label></div>
+    <p class="muted small" style="margin:8px 0 0">${LG('Jeokimyasal veriler çoğunlukla log-normal dağılır; bu yüzden log dönüşümlü Pearson veya Spearman daha güvenilirdir. r ≥ 0,7 güçlü, 0,5–0,7 orta, 0,3–0,5 zayıf ilişki olarak yorumlanabilir.','Geochemical data are mostly log-normally distributed, so log-transformed Pearson or Spearman is more reliable. r ≥ 0.7 can be read as strong, 0.5–0.7 moderate, 0.3–0.5 weak.')}</p></div>
+  <div class="two">
+    <div class="card"><h2>${LG(`${esc(t)} ile birlikte hareket eden elementler`,`Elements moving together with ${esc(t)}`)}</h2>${corrRankSVG(t,C)}
+      ${hints.length?`<h3>${LG('Yorum ipuçları','Interpretation hints')}</h3>${hints.map(h=>`<div class="${h.warn?'warns':'banner'}" style="margin:6px 0">${h.warn?'⚠ ':'💡 '}${esc(h.txt)}${h.warn?'':` <span class="muted small">(${LG('ort.','avg.')} r=${h.r.toFixed(2)})</span>`}</div>`).join('')}<p class="muted small">${LG('İpuçları istatistiksel birlikteliğe dayanır; jeolojik gözlem, mineraloji ve alterasyonla birlikte değerlendirilmelidir.','Hints are based on statistical association only; assess them together with geological observation, mineralogy and alteration.')}</p>`:''}</div>
+    <div class="card"><h2>${LG('Saçılım grafiği','Scatter plot')}</h2>
+      <label class="fld" style="max-width:200px;margin-bottom:8px"><span>${LG('Karşılaştırılan element','Compared element')}</span><select data-on="gcPairSel">${C.els.filter(e=>e!==t).map(e=>`<option ${e===pair?'selected':''}>${esc(e)}</option>`).join('')}</select></label>
+      ${pair?scatterSVG(t,pair):''}</div>
+  </div>
+  <div class="card"><h2>${LG('Korelasyon matrisi','Correlation matrix')}</h2><p class="muted small" style="margin-top:-4px">${LG(`Elementler ${esc(t)} ile korelasyona göre sıralı. Kırmızı pozitif, mavi negatif ilişki; bir hücreye tıklayınca saçılım grafiği o çifte geçer.`,`Elements are sorted by correlation with ${esc(t)}. Red = positive, blue = negative; click a cell to show that pair in the scatter plot.`)}</p>
+    <div style="overflow:auto">${corrMatrixSVG(C,t)}</div></div>`;
+}
+function gcAnomView(t, elSel){
+  const st=gcStats(t), thrP=ui.gx.thr||95, thr=pctl(gcVals(t).sort((a,b)=>a-b), thrP);
+  const L=ui.gx.rows.filter(r=>r.v[t]!=null && r.v[t]>=thr).sort((a,b)=>b.v[t]-a.v[t]);
+  const sm=new Map(DB.samples.map(s=>[String(s.id).toLowerCase(), s]));
+  return `<div class="card"><div class="row" style="align-items:flex-end">${elSel}
+    <label class="fld" style="max-width:200px"><span>${LG('Eşik','Threshold')}</span><select data-on="gcThr">${[75,90,95,98].map(p=>`<option value="${p}" ${p===thrP?'selected':''}>P${p}</option>`).join('')}</select></label>
+    <span class="pill">${LG('Eşik değer','Threshold value')}: ${fmtv(thr)} ${esc(ui.gx.unit[t])}</span><span class="pill warn">${L.length} ${LG('örnek','samples')}</span>
+    <button class="btn ghost sm" data-act="gcAnomCsv" style="margin-left:auto">CSV</button></div></div>
+  <div class="card"><div class="tblwrap"><table class="cards sheet"><thead><tr><th>${LG('Sıra','Rank')}</th><th>${LG('Örnek no','Sample no.')}</th><th>${esc(t)} (${esc(ui.gx.unit[t])})</th><th>×${LG('medyan','median')}</th><th>${LG('Veri seti','Dataset')}</th><th>UTM E / N</th><th>${LG('GEOLOOT kaydı','GEOLOOT record')}</th></tr></thead><tbody>
+    ${L.map((r,i)=>{ const s=sm.get(String(r.id).toLowerCase()); return `<tr><td data-l="#">${i+1}</td><td data-l="${LG('Örnek no','Sample no.')}"><b>${esc(r.id)}</b></td><td data-l="${esc(t)}"><b>${fmtv(r.v[t])}</b></td><td data-l="×">${st.p50?(r.v[t]/st.p50).toFixed(1):'—'}</td><td data-l="${LG('Veri seti','Dataset')}" class="small">${esc(r.ds)}</td><td data-l="UTM">${r.E!=null?Math.round(r.E)+' / '+Math.round(r.N):'—'}</td><td data-l="GEOLOOT" class="small">${s?esc(summaryOf(s)||s.id):'—'}</td></tr>`; }).join('')}
+  </tbody></table></div></div>`;
+}
+
+/* ---- tematik harita ---- */
+const gcMap={w:0,h:0,dpr:1,cx:0.5,cy:0.5,s:1024,fit:false,tiles:new Map(),pts:[],ptr:new Map(),idwImg:null,idwKey:'',sel:null};
+const merc=(lat,lon)=>{ const s=Math.sin(lat*Math.PI/180); return [(lon+180)/360, 0.5-Math.log((1+s)/(1-s))/(4*Math.PI)]; };
+const unmercLat=y=>{ const n=Math.PI-2*Math.PI*y; return 180/Math.PI*Math.atan(0.5*(Math.exp(n)-Math.exp(-n))); };
+function gcMapView(t, elSel){
+  const nXY=ui.gx.rows.filter(r=>r.lat!=null&&r.v[t]!=null).length;
+  afterQueue.push(gcMapInit);
+  return `<div class="card"><div class="row" style="align-items:flex-end">${elSel}
+    <label class="fld" style="max-width:190px"><span>${LG('Altlık','Basemap')}</span><select data-on="gcBase"><option value="none" ${ui.gx.base==='none'?'selected':''}>${LG('Yok (çevrimdışı)','None (offline)')}</option><option value="osm" ${ui.gx.base==='osm'?'selected':''}>OpenStreetMap</option><option value="topo" ${ui.gx.base==='topo'?'selected':''}>OpenTopoMap (${LG('topografik','topographic')})</option></select></label>
+    <label class="row small" style="gap:6px"><input type="checkbox" data-on="gcIdw" ${ui.gx.idw?'checked':''}> ${LG('Yoğunlaşma yüzeyi (IDW)','Concentration surface (IDW)')}</label>
+    <label class="row small" style="gap:6px"><input type="checkbox" data-on="gcLab" ${ui.gx.labels?'checked':''}> ${LG('≥P95 etiketleri','≥P95 labels')}</label>
+    <div class="row" style="margin-left:auto"><button class="btn ghost sm" data-act="gcZoom" data-z="1.6">＋</button><button class="btn ghost sm" data-act="gcZoom" data-z="0.625">－</button><button class="btn ghost sm" data-act="gcFit">⤢</button><button class="btn sm" data-act="gcPng">PNG</button></div></div>
+    ${nXY?'':`<div class="warns">⚠ ${LG('Bu element için koordinatlı örnek yok. İçe aktarmada koordinat sütunlarını veya GEOLOOT eşleştirmesini kontrol edin.','No samples with coordinates for this element. Check the coordinate columns or GEOLOOT matching at import.')}</div>`}
+    <div id="gcMapBox" style="position:relative;margin-top:10px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#eef0ea;touch-action:none">
+      <canvas id="gcCanvas" style="display:block;width:100%;height:520px;cursor:grab"></canvas>
+      <div id="gcTip" style="position:absolute;display:none;pointer-events:none;background:#1d221e;color:#fff;font-size:12.5px;padding:6px 9px;border-radius:7px;white-space:nowrap;z-index:2"></div>
+    </div>
+    <p class="muted small" style="margin:8px 0 0">${LG('Sürükleyerek kaydırın, fare tekerleği veya iki parmakla yakınlaştırın, bir örneğe dokunarak değerini görün. Renk sınıfları seçili verideki persentillere göre (P50, P75, P90, P95, P98) belirlenir. Altlık harita internet gerektirir.','Drag to pan, use the mouse wheel or two fingers to zoom, tap a sample to see its value. Colour classes are based on percentiles of the selected data (P50, P75, P90, P95, P98). Basemaps need internet.')}</p></div>`;
+}
+function gcMapPrep(){
+  const t=ui.gx.el, vals=gcVals(t,true).sort((a,b)=>a-b);
+  gcMap.br=GC_PCT.map(p=>pctl(vals,p));
+  gcMap.pts=ui.gx.rows.filter(r=>r.lat!=null&&r.lon!=null&&r.v[t]!=null).map(r=>{ const [x,y]=merc(r.lat,r.lon); const v=r.v[t]; let c=0; while(c<5 && v>gcMap.br[c]) c++; return {x,y,v,c,id:r.id,ds:r.ds,bdl:r.bdl&&r.bdl.includes(t)}; }).sort((a,b)=>a.c-b.c||a.v-b.v);
+}
+function gcMapInit(){
+  const cv=$('#gcCanvas'); if(!cv) return;
+  gcMapPrep();
+  const box=cv.getBoundingClientRect(); gcMap.dpr=window.devicePixelRatio||1; gcMap.w=box.width; gcMap.h=box.height;
+  cv.width=Math.round(gcMap.w*gcMap.dpr); cv.height=Math.round(gcMap.h*gcMap.dpr);
+  if(!gcMap.fit || gcMap.fitKey!==ui.gx.key) gcFitView();
+  gcMap.idwKey='';
+  cv.onpointerdown=e=>{ cv.setPointerCapture(e.pointerId); gcMap.ptr.set(e.pointerId,{x:e.offsetX,y:e.offsetY,x0:e.offsetX,y0:e.offsetY}); cv.style.cursor='grabbing'; };
+  cv.onpointermove=e=>{ const p=gcMap.ptr.get(e.pointerId); if(!p) return;
+    if(gcMap.ptr.size===1){ gcMap.cx-=(e.offsetX-p.x)/gcMap.s; gcMap.cy-=(e.offsetY-p.y)/gcMap.s; p.x=e.offsetX; p.y=e.offsetY; gcMap.moving=true; gcDraw(true); }
+    else if(gcMap.ptr.size===2){ const [a,b]=[...gcMap.ptr.values()]; const d0=Math.hypot(a.x-b.x,a.y-b.y); p.x=e.offsetX; p.y=e.offsetY; const d1=Math.hypot(a.x-b.x,a.y-b.y); if(d0>0){ gcZoomAt((a.x+b.x)/2,(a.y+b.y)/2,d1/d0,true); } } };
+  const up=e=>{ const p=gcMap.ptr.get(e.pointerId); gcMap.ptr.delete(e.pointerId); cv.style.cursor='grab';
+    if(p && Math.hypot(e.offsetX-p.x0,e.offsetY-p.y0)<5 && !gcMap.ptr.size) gcPickAt(e.offsetX,e.offsetY);
+    if(!gcMap.ptr.size && gcMap.moving){ gcMap.moving=false; gcDraw(); } };
+  cv.onpointerup=up; cv.onpointercancel=up;
+  cv.onwheel=e=>{ e.preventDefault(); gcZoomAt(e.offsetX,e.offsetY,e.deltaY<0?1.25:0.8); };
+  gcDraw();
+}
+function gcFitView(){
+  const P=gcMap.pts; gcMap.fit=true; gcMap.fitKey=ui.gx.key;
+  if(!P.length){ const c=DB.samples.find(s=>s.lat); const [x,y]=c?merc(+c.lat,+c.lon):[0.5,0.5]; gcMap.cx=x; gcMap.cy=y; gcMap.s=256*Math.pow(2,12); return; }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; P.forEach(p=>{ x0=Math.min(x0,p.x); x1=Math.max(x1,p.x); y0=Math.min(y0,p.y); y1=Math.max(y1,p.y); });
+  gcMap.cx=(x0+x1)/2; gcMap.cy=(y0+y1)/2;
+  const dx=Math.max(x1-x0,1e-6), dy=Math.max(y1-y0,1e-6);
+  gcMap.s=Math.min(256*Math.pow(2,18), Math.min((gcMap.w-60)/dx, (gcMap.h-60)/dy));
+}
+function gcZoomAt(px,py,f,quick){
+  const wx=gcMap.cx+(px-gcMap.w/2)/gcMap.s, wy=gcMap.cy+(py-gcMap.h/2)/gcMap.s;
+  gcMap.s=Math.max(256*2, Math.min(256*Math.pow(2,19), gcMap.s*f));
+  gcMap.cx=wx-(px-gcMap.w/2)/gcMap.s; gcMap.cy=wy-(py-gcMap.h/2)/gcMap.s;
+  if(quick){ gcMap.moving=true; gcDraw(true); } else gcDraw();
+}
+function gcPickAt(px,py){
+  const tip=$('#gcTip'); let best=null, bd=14;
+  gcMap.pts.forEach(p=>{ const X=(p.x-gcMap.cx)*gcMap.s+gcMap.w/2, Y=(p.y-gcMap.cy)*gcMap.s+gcMap.h/2, d=Math.hypot(X-px,Y-py); if(d<bd){ bd=d; best={p,X,Y}; } });
+  gcMap.sel=best?best.p:null; gcDraw(true);
+  if(!tip) return;
+  if(!best){ tip.style.display='none'; return; }
+  tip.innerHTML=`<b>${esc(best.p.id)}</b><br>${esc(ui.gx.el)}: ${best.p.bdl?'&lt;':''}${fmtv(best.p.v)} ${esc(ui.gx.unit[ui.gx.el])}<br><span style="opacity:.7">${esc(best.p.ds)}</span>`;
+  tip.style.display='block'; tip.style.left=Math.min(gcMap.w-170,best.X+12)+'px'; tip.style.top=Math.max(4,best.Y-50)+'px';
+}
+function gcTileURL(z,x,y){ const n=1<<z; x=((x%n)+n)%n; if(ui.gx.base==='topo') return `https://${'abc'[(x+y)%3]}.tile.opentopomap.org/${z}/${x}/${y}.png`; return `https://tile.openstreetmap.org/${z}/${x}/${y}.png`; }
+function gcIDW(){
+  const P=gcMap.pts.filter(p=>p.v>0); if(P.length<4) return null;
+  const W=gcMap.w, H=gcMap.h, step=6, cols=Math.ceil(W/step), rows=Math.ceil(H/step);
+  const S=P.map(p=>({X:(p.x-gcMap.cx)*gcMap.s+W/2, Y:(p.y-gcMap.cy)*gcMap.s+H/2, L:Math.log10(p.v)}));
+  const nn=S.map((a,i)=>{ let m=Infinity; for(let j=0;j<S.length;j++){ if(j===i) continue; const d=(a.X-S[j].X)**2+(a.Y-S[j].Y)**2; if(d<m) m=d; } return Math.sqrt(m); }).sort((a,b)=>a-b);
+  const R=Math.max(12, 2.5*(nn[Math.floor(nn.length/2)]||40)), R2=R*R;
+  const lb=gcMap.br.map(v=>v>0?Math.log10(v):-99);
+  const c=document.createElement('canvas'); c.width=cols; c.height=rows; const g=c.getContext('2d'), img=g.createImageData(cols,rows);
+  const rgb=GC_PAL.map(h=>[parseInt(h.slice(1,3),16),parseInt(h.slice(3,5),16),parseInt(h.slice(5,7),16)]);
+  for(let j=0;j<rows;j++) for(let i=0;i<cols;i++){
+    const x=i*step+step/2, y=j*step+step/2; let sw=0, sv=0, near=false;
+    for(const s of S){ const d2=(s.X-x)**2+(s.Y-y)**2; if(d2>R2) continue; near=true; const w=1/Math.max(d2,4); sw+=w; sv+=w*s.L; }
+    if(!near) continue;
+    const L=sv/sw; let k=0; while(k<5 && L>lb[k]) k++;
+    const o=(j*cols+i)*4; img.data[o]=rgb[k][0]; img.data[o+1]=rgb[k][1]; img.data[o+2]=rgb[k][2]; img.data[o+3]=k<1?60:k<2?85:125;
+  }
+  g.putImageData(img,0,0); return c;
+}
+function gcDraw(quick){
+  const cv=$('#gcCanvas'); if(!cv) return; const g=cv.getContext('2d'), W=gcMap.w, H=gcMap.h, s=gcMap.s;
+  g.setTransform(gcMap.dpr,0,0,gcMap.dpr,0,0); g.fillStyle='#eef0ea'; g.fillRect(0,0,W,H);
+  const toX=x=>(x-gcMap.cx)*s+W/2, toY=y=>(y-gcMap.cy)*s+H/2;
+  let tilesOk=true;
+  if(ui.gx.base!=='none'){
+    const z=Math.max(0,Math.min(ui.gx.base==='topo'?17:19, Math.round(Math.log2(s/256)))), n=1<<z, ts=s/n;
+    const tx0=Math.floor((gcMap.cx-W/2/s)*n), tx1=Math.floor((gcMap.cx+W/2/s)*n), ty0=Math.max(0,Math.floor((gcMap.cy-H/2/s)*n)), ty1=Math.min(n-1,Math.floor((gcMap.cy+H/2/s)*n));
+    for(let ty=ty0;ty<=ty1;ty++) for(let tx=tx0;tx<=tx1;tx++){
+      const url=gcTileURL(z,tx,ty); let im=gcMap.tiles.get(url);
+      if(!im){ im=new Image(); im.crossOrigin='anonymous'; im.onload=()=>{ im.ok=true; clearTimeout(gcMap.tt); gcMap.tt=setTimeout(()=>gcDraw(true),60); }; im.onerror=()=>{ im.bad=true; }; im.src=url; gcMap.tiles.set(url,im); if(gcMap.tiles.size>400){ const k=gcMap.tiles.keys().next().value; gcMap.tiles.delete(k); } }
+      if(im.ok) g.drawImage(im, toX(tx/n), toY(ty/n), ts+0.5, ts+0.5); else if(im.bad) tilesOk=false;
+    }
+    g.fillStyle='rgba(255,255,255,.18)'; g.fillRect(0,0,W,H);
+  } else {
+    g.strokeStyle='#dcdfd5'; g.lineWidth=1;
+    const mpp=40075016.686*Math.cos(unmercLat(gcMap.cy)*Math.PI/180)/s, stepM=[100,250,500,1000,2500,5000,10000,25000,50000].find(v=>v/mpp>90)||100000, stepW=stepM/mpp/s;
+    for(let x=Math.floor((gcMap.cx-W/2/s)/stepW)*stepW; x<gcMap.cx+W/2/s; x+=stepW){ g.beginPath(); g.moveTo(toX(x),0); g.lineTo(toX(x),H); g.stroke(); }
+    for(let y=Math.floor((gcMap.cy-H/2/s)/stepW)*stepW; y<gcMap.cy+H/2/s; y+=stepW){ g.beginPath(); g.moveTo(0,toY(y)); g.lineTo(W,toY(y)); g.stroke(); }
+  }
+  if(ui.gx.idw && !quick){ const key=[gcMap.cx,gcMap.cy,s,W,H,ui.gx.el,ui.gx.key].join('|'); if(gcMap.idwKey!==key){ gcMap.idwImg=gcIDW(); gcMap.idwKey=key; } }
+  if(ui.gx.idw && gcMap.idwImg && !quick){ g.imageSmoothingEnabled=true; g.drawImage(gcMap.idwImg,0,0,W,H); }
+  gcMap.pts.forEach(p=>{ const X=toX(p.x), Y=toY(p.y); if(X<-20||Y<-20||X>W+20||Y>H+20) return;
+    g.beginPath(); g.arc(X,Y,GC_RAD[p.c],0,Math.PI*2); g.fillStyle=GC_PAL[p.c]; g.globalAlpha=p.bdl?0.55:0.95; g.fill(); g.globalAlpha=1; g.lineWidth=p===gcMap.sel?2.5:0.8; g.strokeStyle=p===gcMap.sel?'#000':'rgba(30,30,30,.7)'; g.stroke(); });
+  if(ui.gx.labels){ g.font='600 11px system-ui,sans-serif'; g.textBaseline='middle';
+    gcMap.pts.filter(p=>p.c>=4).forEach(p=>{ const X=toX(p.x)+GC_RAD[p.c]+3, Y=toY(p.y); g.lineWidth=3; g.strokeStyle='rgba(255,255,255,.9)'; g.strokeText(p.id,X,Y); g.fillStyle='#1d221e'; g.fillText(p.id,X,Y); }); }
+  // lejant
+  const t=ui.gx.el, u=ui.gx.unit[t]||'', br=gcMap.br||[];
+  const labs=[`≤ ${fmtv(br[0])}`, `${fmtv(br[0])} – ${fmtv(br[1])}`, `${fmtv(br[1])} – ${fmtv(br[2])}`, `${fmtv(br[2])} – ${fmtv(br[3])}`, `${fmtv(br[3])} – ${fmtv(br[4])}`, `> ${fmtv(br[4])}`];
+  const pl=['≤P50','P50–75','P75–90','P90–95','P95–98','>P98'];
+  const lw=200, lh=24+labs.length*19; g.fillStyle='rgba(255,255,255,.92)'; g.strokeStyle='#bbb'; g.lineWidth=1; g.beginPath(); g.roundRect?g.roundRect(10,H-lh-10,lw,lh,8):g.rect(10,H-lh-10,lw,lh); g.fill(); g.stroke();
+  g.fillStyle='#1d221e'; g.font='700 12.5px system-ui,sans-serif'; g.textBaseline='alphabetic'; g.fillText(`${t} (${u})`, 20, H-lh+8);
+  labs.forEach((l,i)=>{ const y=H-lh+14+i*19+12; g.beginPath(); g.arc(28,y-4,Math.min(GC_RAD[i],8),0,Math.PI*2); g.fillStyle=GC_PAL[i]; g.fill(); g.strokeStyle='#444'; g.lineWidth=.7; g.stroke(); g.fillStyle='#1d221e'; g.font='11.5px system-ui,sans-serif'; g.fillText(l, 44, y); g.fillStyle='#888'; g.font='10px system-ui,sans-serif'; g.fillText(pl[i], 150, y); });
+  // ölçek ve kuzey
+  const mpp=40075016.686*Math.cos(unmercLat(gcMap.cy)*Math.PI/180)/s, sm=[50,100,200,250,500,1000,2000,2500,5000,10000,20000,50000].find(v=>v/mpp>=70)||100000, sp=sm/mpp;
+  g.fillStyle='rgba(255,255,255,.9)'; g.fillRect(W-sp-34,H-34,sp+24,24); g.strokeStyle='#1d221e'; g.lineWidth=2; g.beginPath(); g.moveTo(W-sp-22,H-18); g.lineTo(W-22,H-18); g.moveTo(W-sp-22,H-23); g.lineTo(W-sp-22,H-13); g.moveTo(W-22,H-23); g.lineTo(W-22,H-13); g.stroke();
+  g.fillStyle='#1d221e'; g.font='600 11px system-ui,sans-serif'; g.textAlign='center'; g.fillText(sm>=1000?(sm/1000)+' km':sm+' m', W-22-sp/2, H-23); g.textAlign='left';
+  g.beginPath(); g.moveTo(W-28,16); g.lineTo(W-20,36); g.lineTo(W-28,31); g.lineTo(W-36,36); g.closePath(); g.fillStyle='#1d221e'; g.fill(); g.font='700 12px system-ui,sans-serif'; g.textAlign='center'; g.fillText(LG('K','N'), W-28, 50); g.textAlign='left';
+  g.fillStyle='rgba(255,255,255,.85)'; g.fillRect(10,10,Math.min(W-80,360),20); g.fillStyle='#333'; g.font='11px system-ui,sans-serif';
+  g.fillText(`${(curMeta()||{}).name||''} · ${t} · n=${gcMap.pts.length}${ui.gx.base!=='none'?' · © OpenStreetMap'+(ui.gx.base==='topo'?', OpenTopoMap':''):''}`, 16, 24);
+  if(ui.gx.base!=='none' && !tilesOk && !gcMap.tileWarned){ gcMap.tileWarned=true; toast(LG('Altlık harita yüklenemedi (internet yok ya da bu pencerede kapalı).','Basemap could not be loaded (no internet or blocked in this window).'),'warn'); }
+}
+async function gcPng(){
+  const cv=$('#gcCanvas'); if(!cv) return;
+  try{ const b=await new Promise((res,rej)=>{ try{ cv.toBlob(x=>x?res(x):rej(new Error('blob')),'image/png'); }catch(e){ rej(e); } });
+    await saveFile(`${DB.settings.prj}_${ui.gx.el}_tematik_harita_${stamp()}.png`, b); }
+  catch(e){ toast(LG('Altlık harita ile birlikte PNG oluşturulamadı; altlığı “Yok” yapıp tekrar deneyin.','Could not create a PNG with the basemap; set basemap to “None” and try again.'),'warn'); }
+}
+
+/* ---- deneme verisi ---- */
+async function gcDemo(){
+  const base={lat:40.0612, lon:26.9478}, rnd=(a,b)=>a+Math.random()*(b-a);
+  const gauss=()=>{ let u=0,v=0; while(!u) u=Math.random(); while(!v) v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); };
+  const cAu={lat:40.0605, lon:26.9458}, cCu={lat:40.0565, lon:26.9415};
+  const rows=[];
+  for(let i=0;i<160;i++){
+    const lat=base.lat+rnd(-0.022,0.022), lon=base.lon+rnd(-0.03,0.03);
+    const dAu=Math.hypot((lat-cAu.lat)*111, (lon-cAu.lon)*85), dCu=Math.hypot((lat-cCu.lat)*111,(lon-cCu.lon)*85);
+    const fAu=Math.exp(-dAu*dAu/0.35), fCu=Math.exp(-dCu*dCu/0.5), z=gauss();
+    const lg=(m,s)=>Math.pow(10, m+s);
+    const Au=lg(0.3+2.1*fAu, 0.18*gauss()+0.25*z), As=lg(1.0+1.6*fAu, 0.12*gauss()+0.2*z), Sb=lg(-0.2+1.4*fAu, 0.15*gauss()+0.18*z), Hg=lg(-1.4+0.9*fAu,0.3*gauss());
+    const Cu=lg(1.35+1.3*fCu+0.25*fAu, 0.18*gauss()), Mo=lg(-0.1+1.4*fCu, 0.25*gauss()), Pb=lg(1.25+0.3*fAu, 0.22*gauss()), Zn=lg(1.7+0.15*fAu, 0.15*gauss()), Ag=lg(-1.1+0.9*fAu+0.3*fCu, 0.25*gauss());
+    const Fe=lg(0.55+0.1*fCu, 0.08*gauss()), Mn=lg(2.75, 0.12*gauss()), Ni=lg(1.4, 0.2*gauss()), Cr=lg(1.75, 0.2*gauss()), Bi=lg(-0.9+0.5*fCu, 0.3*gauss());
+    const u=toUTM(lat,lon), id='KRB-SS-'+String(1001+i);
+    const r={id, lat:+lat.toFixed(6), lon:+lon.toFixed(6), E:+u.E.toFixed(1), N:+u.N.toFixed(1), v:{Au,As,Sb,Hg,Cu,Mo,Pb,Zn,Ag,Fe,Mn,Ni,Cr,Bi}, bdl:[]};
+    if(Au<1){ r.v.Au=0.5; r.bdl.push('Au'); } if(Hg<0.01){ r.v.Hg=0.005; r.bdl.push('Hg'); }
+    rows.push(r);
+  }
+  const u=uid(), els=[['Au','ppb'],['As','ppm'],['Sb','ppm'],['Hg','ppm'],['Cu','ppm'],['Mo','ppm'],['Pb','ppm'],['Zn','ppm'],['Ag','ppm'],['Fe','%'],['Mn','ppm'],['Ni','ppm'],['Cr','ppm'],['Bi','ppm']].map(([el,unit])=>({el,unit}));
+  await gcPut(u, rows);
+  DB.geochem.push({_u:u, name:LG('Deneme – dere sedimanı (-80 mesh)','Demo – stream sediment (-80 mesh)'), media:'Dere sedimanı', date:today(), file:'demo', n:rows.length, nxy:rows.length, els});
+  persist(); gcDefaults(); ui.gx.ds=[u]; ui.gx.key=null; ui.gx.el='Au'; toast(LG('Deneme jeokimya verisi yüklendi','Demo geochemistry data loaded')); render();
+}
+function gcAnomCSV(){
+  const t=ui.gx.el, thr=pctl(gcVals(t).sort((a,b)=>a-b), ui.gx.thr||95);
+  const L=ui.gx.rows.filter(r=>r.v[t]!=null&&r.v[t]>=thr).sort((a,b)=>b.v[t]-a.v[t]);
+  return toCSV(['Örnek no',`${t} (${ui.gx.unit[t]})`,'Veri seti','Enlem','Boylam','UTM E','UTM N', ...ui.gx.els.filter(e=>e!==t).map(e=>`${e} (${ui.gx.unit[e]})`)],
+    L.map(r=>[r.id, r.v[t], r.ds, r.lat, r.lon, r.E, r.N, ...ui.gx.els.filter(e=>e!==t).map(e=>r.v[e]??'')]));
+}
+
 /* ---------- AKTAR / AYARLAR ---------- */
 function viewExport(){
   const s=DB.settings;
@@ -2146,7 +2649,6 @@ function viewExport(){
         <button class="btn acc" data-act="exp" data-x="json">JSON yedek indir</button>
         <label class="row small" style="gap:6px"><input type="checkbox" id="bk_ph" checked> fotoğrafları da ekle</label>
         <label class="btn ghost" style="cursor:pointer">Yedeği içe aktar<input type="file" accept=".json,application/json" data-on="import" hidden></label>
-        <button class="btn ghost" data-act="demo">Deneme verisi ekle</button>
         <button class="btn danger" data-act="wipe">Tüm veriyi sil</button>
       </div>
     </div>
@@ -2229,6 +2731,7 @@ async function backupJSON(){
   const withPh=!!($('#bk_ph')&&$('#bk_ph').checked);
   const out=JSON.parse(JSON.stringify(DB)); out.project={...(curMeta()||{})}; delete out.project.id; delete out.project.stats;
   if(withPh){ out.photoData={}; let n=0; for(const id of photoRefs(true)){ const o=await phGet(id); if(o){ out.photoData[id]=await blobToDataURL(o.full); n++; } } toast(`${n} fotoğraf yedeğe eklendi`); }
+  if(DB.geochem.length){ out.gcData={}; for(const d of DB.geochem){ const r=await gcGet(d._u); if(r) out.gcData[d._u]=r; } }
   await saveFile(`${DB.settings.prj}_geoloot_yedek_${stamp()}${withPh?'_fotolu':''}.json`, JSON.stringify(out));
 }
 let dlNS=null, dlTried=false;
@@ -2364,6 +2867,18 @@ const ACT = {
   camera:()=>openCamera(),
   phOpen:el=>openPhoto(+el.dataset.i),
   logSamp:el=>sampleModal(+el.dataset.i),
+  gcTab:el=>{ ui.gx.tab=el.dataset.t; render(); },
+  gcDs:el=>{ const u=el.dataset.u, a=ui.gx.ds; if(a.includes(u)){ if(a.length>1) ui.gx.ds=a.filter(x=>x!==u); } else ui.gx.ds=[...a,u]; ui.gx.key=null; gcMap.fit=false; render(); },
+  gcDelDs:async el=>{ const d=DB.geochem.find(x=>x._u===el.dataset.u); if(!d) return; if(!await confirmBox(LG(`“${d.name}” veri seti (${d.n} örnek) silinsin mi?`,`Delete dataset “${d.name}” (${d.n} samples)?`),'Sil')) return; DB.geochem=DB.geochem.filter(x=>x!==d); await gcDel(d._u); ui.gx.ds=ui.gx.ds.filter(x=>x!==d._u); ui.gx.key=null; persist(); render(); },
+  gcCancel:()=>{ ui.gcImp=null; ui.gcView='main'; render(); },
+  gcDoImport:()=>gcDoImport(),
+  gcDemo:()=>gcDemo(),
+  gcPick:el=>{ ui.gx.el=el.dataset.e; ui.gx.tab='corr'; render(); },
+  gcPair:el=>{ const a=el.dataset.a, b=el.dataset.b; if(a===b) return; if(a===ui.gx.el) ui.gx.pair=b; else if(b===ui.gx.el) ui.gx.pair=a; else { ui.gx.el=a; ui.gx.pair=b; } render(); },
+  gcZoom:el=>gcZoomAt(gcMap.w/2,gcMap.h/2,+el.dataset.z),
+  gcFit:()=>{ gcFitView(); gcDraw(); },
+  gcPng:()=>gcPng(),
+  gcAnomCsv:async()=>{ await saveFile(`${DB.settings.prj}_${ui.gx.el}_anomaliler_${stamp()}.csv`, gcAnomCSV()); },
   newProj:()=>go('yeni-proje'),
   goHome:()=>go('home'),
   openProj:el=>openProject(el.dataset.id),
@@ -2437,6 +2952,7 @@ document.addEventListener('focusin', e=>{ const t=e.target; if(t.dataset&&t.data
 document.addEventListener('input', e=>{
   const t=e.target, f=t.form;
   if(t.dataset.c && t.closest('#lg')){ logCellChange(t); return; }
+  if(t.dataset.gci && ui.gcImp && t.tagName==='INPUT'){ const k=t.dataset.gci; ui.gcImp[k]=t.value; return; }
   if(t.dataset.on==='dbq'){ ui.dbq=t.value; clearTimeout(window._dbT); window._dbT=setTimeout(()=>dbRefresh(),200); return; }
   if(f && f.dataset.form==='proj' && t.name==='country'){ const dl=$('#dl_region'); if(dl) dl.innerHTML=regionsFor(t.value).map(o=>`<option value="${esc(o)}">`).join(''); }
   if(t.dataset.on==='shFilter'){ ui.shFrom=$('#shFrom').value; ui.shTo=$('#shTo').value; clearTimeout(window._shT); window._shT=setTimeout(()=>{ const sb=$('#sheetBody'); if(sb) sb.innerHTML=sheetBody(curHole()); const on=!!sheetRows(curHole()).length; document.querySelectorAll('[data-act=sheetPdf],[data-act=sheetCsv]').forEach(b=>b.disabled=!on); },250); return; }
@@ -2459,6 +2975,20 @@ document.addEventListener('change', e=>{
   if(t.dataset.c && t.closest('#lg')){ logCellChange(t); if(t.dataset.c==='to') logToCommitted(t); return; }
   if(t.dataset.on==='scale'){ ui.scale=+t.value; render(); }
   if(t.dataset.on==='dbs'){ ui.dbs=t.value; dbRefresh(); }
+  if(t.dataset.on==='gcFile' && t.files[0]){ gcStartImport(t.files[0]); t.value=''; return; }
+  if(t.dataset.on==='gcEl'){ ui.gx.el=t.value; ui.gx.pair=null; gcMap.idwKey=''; render(); return; }
+  if(t.dataset.on==='gcMethod'){ ui.gx.method=t.value; ui.gx.corr=null; render(); return; }
+  if(t.dataset.on==='gcPairSel'){ ui.gx.pair=t.value; render(); return; }
+  if(t.dataset.on==='gcBase'){ ui.gx.base=t.value; gcMap.tileWarned=false; gcDraw(); return; }
+  if(t.dataset.on==='gcIdw'){ ui.gx.idw=t.checked; gcDraw(); return; }
+  if(t.dataset.on==='gcLab'){ ui.gx.labels=t.checked; gcDraw(); return; }
+  if(t.dataset.on==='gcThr'){ ui.gx.thr=+t.value; render(); return; }
+  if(t.dataset.gcel!=null && ui.gcImp){ ui.gcImp.els[+t.dataset.gcel].on=t.checked; render(); return; }
+  if(t.dataset.gci && ui.gcImp){ const k=t.dataset.gci, imp=ui.gcImp;
+    if(['header','idCol','xCol','yCol'].includes(k)) imp[k]=+t.value; else if(k==='decComma') imp[k]=t.value==='1'; else imp[k]=t.value;
+    if(k==='header') gcGuess(imp);
+    if(k==='coord' && t.value!=='match' && (imp.xCol<0||imp.yCol<0)){ const c=imp.coord; gcGuess(imp); imp.coord=c; }
+    if(['header','coord','idCol','xCol','yCol'].includes(k)) render(); return; }
   if(t.dataset.on==='obsMode'){ const pk=$('#obsPick'); if(pk) pk.hidden = t.value!=='existing'; }
   if(t.dataset.on==='dbsel'){ t.checked?ui.dbSel.add(t.dataset.k):ui.dbSel.delete(t.dataset.k); t.closest('tr').classList.toggle('on',t.checked); dbRefresh(false); const all=$('input[data-on=dball]'); if(all){ const L=dbFiltered(); all.checked=L.length&&L.every(x=>ui.dbSel.has(x.key)); } return; }
   if(t.dataset.on==='dball'){ dbFiltered().forEach(x=>t.checked?ui.dbSel.add(x.key):ui.dbSel.delete(x.key)); dbRefresh(); return; }
@@ -2470,8 +3000,9 @@ document.addEventListener('change', e=>{
       try{ const d=JSON.parse(r.result); if(!Array.isArray(d.samples)) throw 0;
         const nph=d.photoData?Object.keys(d.photoData).length:0;
         if(!await confirmBox(`Yedekte ${d.samples.length} örnek, ${(d.obs||[]).length} saha gözlemi, ${(d.meas||[]).length} ölçüm, ${(d.holes||[]).length} kuyu${nph?`, ${nph} fotoğraf`:''} var. Bu projedeki mevcut verinin yerine geçsin mi? (Yeni proje olarak açmak için ana ekrandaki “Yedekten proje aç”ı kullanın.)`,'İçe aktar',false)) return;
-        const pd=d.photoData; delete d.photoData; delete d.project;
-        DB=normalize(d); persist();
+        const pd=d.photoData; delete d.photoData; delete d.project; const gd=d.gcData; delete d.gcData;
+        DB=normalize(d); persist(); ui.gx&&(ui.gx.key=null);
+        if(gd){ for(const [k,r] of Object.entries(gd)) await gcPut(k,r); }
         if(pd){ for(const [id,u] of Object.entries(pd)){ try{ const full=dataURLToBlob(u); const {thumb}=await makePhotoBlobs(full); await phPut({id, full, thumb}); }catch(_){} } }
         toast('Yedek yüklendi'); render();
       }catch(_){ toast('Geçersiz yedek dosyası','err'); }
@@ -2481,6 +3012,7 @@ document.addEventListener('change', e=>{
 });
 window.addEventListener('hashchange', ()=>{ const h=location.hash.slice(1); if(!h||h===ui.view) return; if(h==='home'&&APP.current){ exitProject(); return; } if(NAV.some(n=>n[0]===h)&&APP.current){ ui.view=h; render(); } });
 
+window.addEventListener('resize', ()=>{ clearTimeout(window._rzT); window._rzT=setTimeout(()=>{ if(ui.view==='jeokimya' && $('#gcCanvas')) gcMapInit(); },200); });
 /* yüklenebilir uygulama (PWA) */
 let installPrompt=null;
 window.addEventListener('beforeinstallprompt', e=>{ e.preventDefault(); installPrompt=e; if(ui.view==='home') render(); });
