@@ -3465,20 +3465,6 @@ async function svgToPng(svg, scale=2){
     const cv=document.createElement('canvas'); cv.width=Math.round(w*scale); cv.height=Math.round(h*scale); const g=cv.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,cv.width,cv.height); g.drawImage(im,0,0,cv.width,cv.height);
     return {data:cv.toDataURL('image/png'), w:cv.width, h:cv.height}; } catch(e){ return null; } finally{ URL.revokeObjectURL(url); }
 }
-async function deckMap(gel){
-  const save=ui.pm; let out=null; const cv=document.createElement('canvas');
-  try{
-    ui.pm={lay:gel?{s:false,o:false,m:false,d:true,k:true,g:true,lab:false}:{s:true,o:true,m:true,d:true,k:true,g:false,lab:true}, base:'none', gel};
-    if(gel) await pmGcLoad();
-    await Promise.all((DB.layers||[]).filter(l=>l.kind==='image').map(pmImgLoad));
-    cv.style.cssText='position:fixed;left:-20000px;top:0;width:1500px;height:900px'; document.body.appendChild(cv);
-    const M=GMap(cv,{base:()=>'none', draw:pmDraw}); M.resize();
-    const P=pmFeatures().map(f=>[f.x,f.y]);
-    (DB.layers||[]).forEach(l=>{ if(l.kind==='image'&&l.b){ P.push(merc(l.b.n,l.b.w), merc(l.b.s,l.b.e)); } (l.feats||[]).forEach(f=>f.c.forEach(c=>P.push(merc(c[1],c[0])))); });
-    if(M.fit(P)){ M.draw(); out={data:cv.toDataURL('image/png'), w:cv.width, h:cv.height}; }
-  }catch(e){ out=null; }
-  cv.remove(); ui.pm=save; return out;
-}
 const fDate = d => d ? d.split('-').reverse().join('.') : '';
 function dateRange(list){ const d=list.map(x=>x.date).filter(Boolean).sort(); return d.length?(d[0]===d[d.length-1]?fDate(d[0]):`${fDate(d[0])} – ${fDate(d[d.length-1])}`):''; }
 function meanPlane(L){
@@ -3486,108 +3472,6 @@ function meanPlane(L){
   L.forEach(m=>{ const t=((+m.dd)+180)*r, p=(90-(+m.dip))*r; X+=Math.sin(t)*Math.cos(p); Y+=Math.cos(t)*Math.cos(p); Z+=-Math.sin(p); });
   const n=Math.hypot(X,Y,Z); if(!n) return null; X/=n; Y/=n; Z/=n; if(Z>0){ X=-X; Y=-Y; Z=-Z; }
   const tr=((Math.atan2(X,Y)/r)+360)%360, pl=Math.asin(-Z)/r; return {dip:Math.round(90-pl), dd:Math.round((tr+180)%360), R:n/L.length};
-}
-async function buildDeck(){
-  const m=curMeta()||{}, S=[], P=LG, prj=m.name||DB.settings.prj;
-  await ensureAssayIndex(); const ic=icSettings();
-  // kapak
-  const logo=await svgToPng(LOGO_SVG(120),3);
-  S.push({cover:true, title:prj, lines:[[m.district,m.region,m.country].filter(Boolean).join(' · '), m.license?P(`Ruhsat: ${m.license}`,`Licence: ${m.license}`):'', m.client||''].filter(Boolean),
-    foot:P(`Veri özeti · ${fDate(today())}`,`Data summary · ${fDate(today())}`)+(m.geo?` · ${m.geo}`:''), logo});
-  // genel özet
-  const cnt=t=>DB.samples.filter(s=>s.type===t).length, drillM=DB.holes.reduce((s,h)=>s+(+h.eoh||lastTo(h.lith)||0),0), nDS=DB.holes.reduce((s,h)=>s+h.samp.length,0), nQC=DB.holes.reduce((s,h)=>s+(h.qc||[]).length,0)+cnt('QC');
-  const k=[]; const kp=(v,l)=>{ if(v) k.push({v:String(v), l}); };
-  kp(DB.samples.length-cnt('QC'),P('Yüzey örneği','Surface samples')); kp(DB.obs.length,P('Saha gözlemi','Field observations')); kp(DB.meas.length,P('Yapısal ölçüm','Structural measurements'));
-  kp(DB.holes.length,P('Sondaj kuyusu','Drill holes')); kp(drillM?Math.round(drillM).toLocaleString('tr-TR')+' m':'',P('Toplam sondaj','Total drilled')); kp(nDS,P('Sondaj numunesi','Drill samples'));
-  kp(nQC,P('QA/QC numunesi','QA/QC samples')); kp(DB.geochem.reduce((s,d)=>s+d.n,0),P('Laboratuvar sonucu','Lab results'));
-  const allRec=[...DB.samples,...DB.obs,...DB.meas];
-  S.push({title:P('Proje özeti','Project summary'), items:[{t:'kpi', list:k.slice(0,8)},
-    {t:'text', x:0.6, y:6.25, w:12.1, h:0.5, size:13, color:DK.mut, text:[dateRange(allRec)?P(`Saha çalışması: ${dateRange(allRec)}`,`Fieldwork: ${dateRange(allRec)}`):'', m.desc||''].filter(Boolean).join('   ·   ')}]});
-  // proje haritası
-  const map1=await deckMap(null);
-  if(map1) S.push({title:P('Proje haritası','Project map'), items:[{t:'img', x:0.6, y:1.25, w:12.1, h:5.6, img:map1}], note:P('Örnekler, gözlemler, yapısal ölçümler, sondaj kuyuları ve harita katmanları','Samples, observations, structural measurements, drill holes and map layers')});
-  // yüzey örnekleme
-  const types=['SS','SL','RK','QC'].filter(t=>cnt(t));
-  if(types.length){
-    const has=new Set(); for(const d of DB.geochem){ (await gcGet(d._u)||[]).forEach(r=>has.add(String(r.id).trim().toLowerCase())); }
-    const rows=types.map(t=>{ const L=DB.samples.filter(s=>s.type===t); return [P(TYPES[t].ad,T(TYPES[t].ad)), L.length, L.filter(s=>s.durum==='Laba gönderildi').length, L.filter(s=>s.durum==='Sonuç geldi'||has.has(String(s.id).trim().toLowerCase())).length, dateRange(L)]; });
-    const bl=[]; const rk=DB.samples.filter(s=>s.type==='RK');
-    if(rk.length){ const lit={}; rk.forEach(s=>{ if(s.lito) lit[s.lito]=(lit[s.lito]||0)+1; }); const top=Object.entries(lit).sort((a,b)=>b[1]-a[1]).slice(0,4); if(top.length) bl.push(P('Kayaç örneklerinde litoloji: ','Rock sample lithology: ')+top.map(([l,n])=>`${l} (${n})`).join(', ')); }
-    const sl=DB.samples.filter(s=>s.type==='SL'); if(sl.length){ const hz={}; sl.forEach(s=>{ if(s.horizon) hz[s.horizon]=(hz[s.horizon]||0)+1; }); const t=Object.entries(hz).sort((a,b)=>b[1]-a[1]); if(t.length) bl.push(P('Toprak horizonu: ','Soil horizon: ')+t.map(([l,n])=>`${l} (${n})`).join(', ')); }
-    const ss=DB.samples.filter(s=>s.type==='SS'); if(ss.length){ const fr={}; ss.forEach(s=>{ if(s.fraksiyon) fr[s.fraksiyon]=(fr[s.fraksiyon]||0)+1; }); const t=Object.entries(fr); if(t.length) bl.push(P('Sediman fraksiyonu: ','Sediment fraction: ')+t.map(([l,n])=>`${l} (${n})`).join(', ')); }
-    S.push({title:P('Yüzey örneklemesi','Surface sampling'), items:[{t:'table', x:0.6, y:1.35, w:12.1, head:[P('Örnek tipi','Sample type'),P('Adet','Count'),P('Laba gönderildi','Sent to lab'),P('Sonucu var','With results'),P('Tarih aralığı','Date range')], rows, colW:[3.4,1.5,2.1,2.1,3.0]},
-      ...(bl.length?[{t:'bullets', x:0.6, y:1.35+0.42*(rows.length+1)+0.4, w:12.1, h:2.4, lines:bl, size:14}]:[])]});
-  }
-  // jeokimya (yüzey, koordinatlı)
-  const surf=DB.geochem.filter(d=>d.nxy>0);
-  if(surf.length){
-    const rows=[], unit={}, els=[];
-    for(const d of surf){ const R=await gcGet(d._u)||[]; d.els.forEach(e=>{ if(!(e.el in unit)){ unit[e.el]=e.unit; els.push(e.el); } }); const f={}; d.els.forEach(e=>{ f[e.el]=(UNIT_PPM[e.unit]||1)/(UNIT_PPM[unit[e.el]]||1); }); R.forEach(r=>{ const v={}; for(const k in r.v) v[k]=r.v[k]*(f[k]||1); rows.push({id:r.id, v}); }); }
-    const main=els.includes(ic.el)?ic.el:els.includes('Au')?'Au':els[0];
-    const st=el=>{ const a=rows.map(r=>r.v[el]).filter(v=>v!=null).sort((x,y)=>x-y); return {n:a.length, med:pctl(a,50), p95:pctl(a,95), max:a[a.length-1]}; };
-    const order=[main, ...els.filter(e=>e!==main)].slice(0,11);
-    const lg=v=>v>0?Math.log10(v):null, cor=els.filter(e=>e!==main).map(e=>({e, r:pearson(rows.map(r=>lg(r.v[main])), rows.map(r=>lg(r.v[e]))).r})).filter(x=>x.r!=null).sort((a,b)=>b.r-a.r).slice(0,6);
-    S.push({title:P(`Jeokimya özeti · ${surf.map(d=>d.media||'').filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).join(', ')}`,`Geochemistry summary · ${surf.map(d=>T(d.media||'')).filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).join(', ')}`),
-      items:[{t:'table', x:0.6, y:1.35, w:7.6, head:['Element',P('Birim','Unit'),'n',P('Medyan','Median'),'P95','Max'], rows:order.map(e=>{ const s=st(e); return [e, unit[e], s.n, fmtv(s.med), fmtv(s.p95), fmtv(s.max)]; }), colW:[1.2,1.0,0.9,1.5,1.5,1.5]},
-        ...(cor.length?[{t:'text', x:8.6, y:1.35, w:4.1, h:0.4, size:15, bold:true, text:P(`${main} ile korelasyon (log Pearson r)`,`Correlation with ${main} (log Pearson r)`)},
-          {t:'table', x:8.6, y:1.85, w:4.1, head:['Element','r',P('İlişki','Strength')], rows:cor.map(c=>[c.e, c.r.toFixed(2), c.r>=0.7?P('güçlü','strong'):c.r>=0.5?P('orta','moderate'):c.r>=0.3?P('zayıf','weak'):'—']), colW:[1.3,1.2,1.6]}]:[])],
-      note:P(`${rows.length} örnek, ${surf.length} veri seti. Tespit sınırı altı değerler içe aktarmadaki kurala göre.`,`${rows.length} samples, ${surf.length} dataset(s). Below-detection values follow the import rule.`)});
-    const map2=await deckMap(main); const med=st(main).med;
-    const top=rows.filter(r=>r.v[main]!=null).sort((a,b)=>b.v[main]-a.v[main]).slice(0,10);
-    if(map2) S.push({title:P(`${main} dağılımı ve anomaliler`,`${main} distribution and anomalies`), items:[{t:'img', x:0.6, y:1.25, w:7.9, h:5.6, img:map2},
-      {t:'table', x:8.8, y:1.35, w:3.9, head:[P('Örnek no','Sample'),`${main} (${unit[main]})`,'×'+P('medyan','median')], rows:top.map(r=>[r.id, fmtv(r.v[main]), med?(r.v[main]/med).toFixed(1):'—']), colW:[1.7,1.2,1.0], size:10}],
-      note:P('Renk sınıfları persentillere göre: P50, P75, P90, P95, P98','Colour classes by percentile: P50, P75, P90, P95, P98')});
-  }
-  // sondaj
-  if(DB.holes.length){
-    const HI=DB.holes.map(h=>{ const IC=holeIntercepts(h,ic).IC; const best=IC.slice().sort((a,b)=>b.g*b.len-a.g*a.len)[0]; return {h, IC, best}; });
-    S.push({title:P('Sondaj programı','Drilling programme'), items:[{t:'table', x:0.6, y:1.35, w:12.1,
-      head:[P('Kuyu','Hole'),P('Azimut / eğim','Azimuth / dip'),'EOH (m)',P('Loglanan (m)','Logged (m)'),P('Numune','Samples'),'QC',P('En iyi aralık','Best intercept')],
-      rows:HI.slice(0,12).map(({h,best})=>[h.id, `${h.azi??'—'}° / ${h.dip??'—'}°`, h.eoh||h.plan||'—', fm(lastTo(h.lith))||'—', h.samp.length, (h.qc||[]).length, best?`${best.len.toFixed(2)} m @ ${fmtG(best.g,ic.unit)} ${ic.unit} ${ic.el}`:'—']), colW:[1.4,1.7,1.1,1.4,1.2,0.8,4.5], size:11}],
-      note:P(`Toplam ${Math.round(drillM)} m. Tenör aralıkları: alt tenör ${ic.cut} ${ic.unit}, en fazla ${ic.dil} m iç seyrelme, en kısa ${ic.min} m.`,`Total ${Math.round(drillM)} m. Intercepts: cut-off ${ic.cut} ${ic.unit}, max ${ic.dil} m internal dilution, min ${ic.min} m.`)});
-    const allIC=HI.flatMap(x=>x.IC).sort((a,b)=>b.g*b.len-a.g*a.len);
-    if(allIC.length){
-      S.push({title:P('Önemli aralıklar','Significant intercepts'), items:[{t:'bullets', x:0.6, y:1.35, w:12.1, h:5.3, lines:allIC.slice(0,12).map(c=>c.text+(PREC.includes(ic.el)&&ic.unit==='g/t'?`  (${(c.g*c.len).toFixed(1)} g·m)`:'')), size:allIC.length>8?13:15}],
-        note:P(`Uzunluk ağırlıklı ortalama; “içinde” eşiği ${ic.hi} ${ic.unit}.`,`Length-weighted average; “including” threshold ${ic.hi} ${ic.unit}.`)});
-      const bestH=HI.filter(x=>x.best).sort((a,b)=>b.best.g*b.best.len-a.best.g*a.best.len)[0];
-      if(bestH){ const sc=ui.scale; const depth=Math.max(+bestH.h.eoh||0, lastTo(bestH.h.lith), lastTo(bestH.h.samp), 10); ui.scale=Math.max(2,Math.min(16,Math.floor(1100/depth)));
-        const svg=stripLog(bestH.h); ui.scale=sc; const img=await svgToPng(svg,1.6);
-        if(img) S.push({title:P(`Grafik log · ${bestH.h.id}`,`Strip log · ${bestH.h.id}`), items:[{t:'img', x:0.6, y:1.25, w:8.4, h:5.7, img},
-          {t:'bullets', x:9.3, y:1.35, w:3.5, h:5.3, size:13, lines:[`Az ${bestH.h.azi??'—'}° / ${bestH.h.dip??'—'}°, EOH ${bestH.h.eoh||'—'} m`, ...bestH.IC.map(c=>c.text.replace(bestH.h.id+': ',''))]}]}); }
-    }
-  }
-  // yapısal
-  if(DB.meas.length){
-    const kinds=[...new Set(DB.meas.map(m=>m.kind))];
-    const rows=kinds.map(kd=>{ const L=DB.meas.filter(m=>m.kind===kd), mp=meanPlane(L); return [P(kd,T(kd)), L.length, mp?`${pad3(mp.dd)} / ${mp.dip}°`:'—', mp?`${pad3((mp.dd+270)%360)}`:'—']; });
-    const st=await svgToPng(stereonet(DB.meas, 520),2);
-    S.push({title:P('Yapısal veriler','Structural data'), items:[...(st?[{t:'img', x:0.6, y:1.25, w:5.6, h:5.6, img:st}]:[]),
-      {t:'table', x:6.7, y:1.35, w:6.0, head:[P('Yapı tipi','Structure'),'n',P('Ort. eğim yönü / eğim','Mean dip dir. / dip'),P('Doğrultu','Strike')], rows, colW:[1.8,0.8,2.2,1.2]}],
-      note:P('Stereonet: Schmidt, alt yarıküre, düzlem kutupları. Ortalama, kutup vektörlerinin ortalamasıdır.','Stereonet: Schmidt, lower hemisphere, poles to planes. Mean = mean pole vector.')});
-  }
-  // QA/QC
-  const qel=assayIdx.els.includes(ic.el)?ic.el:assayIdx.els[0];
-  if(qel){
-    const items=qcItems(), unit=assayIdx.units[qel], val=id=>{ const a=assayOf(id); return a?a.v[qel]:null; }, rows=[];
-    const G={}; items.filter(q=>qcKind(q.tip)==='std').forEach(q=>{ const v=val(q.id); if(v!=null) (G[q.ref||'?']=G[q.ref||'?']||[]).push(v); });
-    Object.entries(G).forEach(([n,v])=>{ const c=crmList().find(x=>x.name===n&&x.el===qel); const avg=v.reduce((a,b)=>a+b,0)/v.length;
-      if(c){ const f=(UNIT_PPM[c.unit]||1)/(UNIT_PPM[unit]||1), mu=+c.mean*f, sd=+c.sd*f; rows.push([P('Standart','Standard')+' · '+n, v.length, `${P('bias','bias')} ${((avg/mu-1)*100).toFixed(1)}%`, `${v.filter(x=>Math.abs(x-mu)>3*sd).length} ${P('adet >3SD','>3SD')}`]); }
-      else rows.push([P('Standart','Standard')+' · '+n, v.length, `${P('ort.','mean')} ${fmtv(avg)} ${unit}`, P('sertifika değeri yok','no certified value')]); });
-    const bl=items.filter(q=>qcKind(q.tip)==='blk').map(q=>val(q.id)).filter(v=>v!=null); const dl=approxDL(qel), lim=+((DB.settings.blankLim||{})[qel])||(dl?dl*5:0);
-    if(bl.length) rows.push(['Blank', bl.length, `${P('eşik','limit')} ${fmtv(lim)} ${unit}`, `${bl.filter(v=>v>lim).length} ${P('adet eşik üstü','above limit')}`]);
-    const dp=items.filter(q=>['fdup','cdup','pdup'].includes(qcKind(q.tip))).map(q=>({a:val(q.ref), b:val(q.id)})).filter(p=>p.a>0&&p.b>0&&(p.a+p.b)/2>=(dl||0)*10);
-    if(dp.length){ const h=dp.map(p=>Math.abs(p.a-p.b)/(p.a+p.b)*100); rows.push([P('Duplikat','Duplicates'), dp.length, `HARD ≤20%: ${Math.round(h.filter(x=>x<=20).length/h.length*100)}%`, `HARD ≤30%: ${Math.round(h.filter(x=>x<=30).length/h.length*100)}%`]); }
-    if(rows.length) S.push({title:P(`QA/QC özeti · ${qel}`,`QA/QC summary · ${qel}`), items:[{t:'table', x:0.6, y:1.35, w:12.1, head:[P('Kontrol','Control'),'n',P('Sonuç','Result'),P('Uyarı','Flag')], rows, colW:[4.3,1.2,3.4,3.2]}],
-      note:P('Bias: standart ortalamasının sertifika değerinden sapması. HARD = |a−b|/(a+b)×100; tespit sınırına yakın çiftler hariç.','Bias: deviation of the standard mean from the certified value. HARD = |a−b|/(a+b)×100; pairs near detection excluded.')});
-  }
-  // gözlemler
-  if(DB.obs.length){
-    const L=DB.obs.slice().sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||''))).slice(0,10);
-    S.push({title:P('Saha gözlemleri','Field observations'), items:[{t:'table', x:0.6, y:1.35, w:12.1, head:[P('Gözlem no','Obs. no.'),P('Tarih','Date'),P('Başlık','Title'),P('Litoloji / alterasyon','Lithology / alteration')],
-      rows:L.map(o=>[o.id, fDate(o.date), (o.baslik||o.tip||'').slice(0,60), [o.lito,o.alt,o.min].filter(Boolean).join(', ').slice(0,60)]), colW:[2.0,1.5,5.0,3.6], size:11}],
-      note:DB.obs.length>10?P(`Son 10 gözlem gösteriliyor (toplam ${DB.obs.length}).`,`Latest 10 of ${DB.obs.length} observations.`):''});
-  }
-  return S;
 }
 /* ---- PowerPoint ---- */
 async function deckPPTX(S){
@@ -3653,17 +3537,237 @@ function deckPDF(S){
   });
   return doc.output('blob');
 }
-function deckModal(){
+
+const MEDIA_ORDER=['Dere sedimanı','Toprak','Kayaç','Diğer'];
+async function deckGcGroups(){
+  const G={};
+  for(const d of DB.geochem.filter(d=>d.nxy>0 && d.media!=='Sondaj')){
+    const md=MEDIA_ORDER.includes(d.media)?d.media:'Diğer'; const g=G[md]=G[md]||{media:md, rows:[], unit:{}, els:[], ds:[]}; g.ds.push(d.name);
+    const R=await gcGet(d._u)||[]; d.els.forEach(e=>{ if(!(e.el in g.unit)){ g.unit[e.el]=e.unit; g.els.push(e.el); } });
+    const f={}; d.els.forEach(e=>{ f[e.el]=(UNIT_PPM[e.unit]||1)/(UNIT_PPM[g.unit[e.el]]||1); });
+    R.forEach(r=>{ if(r.lat==null) return; const v={}; for(const k in r.v) v[k]=r.v[k]*(f[k]||1); g.rows.push({id:r.id, lat:r.lat, lon:r.lon, v, ds:d.name}); });
+  }
+  const lg=v=>v>0?Math.log10(v):null;
+  Object.values(G).forEach(g=>{ const ic=icSettings(); g.main=g.els.includes(ic.el)?ic.el:g.els.includes('Au')?'Au':g.els[0];
+    g.cor=g.els.filter(e=>e!==g.main).map(e=>({e, r:pearson(g.rows.map(r=>lg(r.v[g.main])), g.rows.map(r=>lg(r.v[e]))).r})).filter(x=>x.r!=null).sort((a,b)=>b.r-a.r);
+    g.def=[g.main, ...g.cor.slice(0,3).map(c=>c.e)]; });
+  return MEDIA_ORDER.map(m=>G[m]).filter(Boolean);
+}
+async function deckMap(gel, gc, size){
+  const save=ui.pm; let out=null; const cv=document.createElement('canvas'), W=(size||[1500,900])[0], H=(size||[1500,900])[1];
+  try{
+    ui.pm={lay:gel?{s:false,o:false,m:false,d:false,k:true,g:true,lab:false}:{s:true,o:true,m:true,d:true,k:true,g:false,lab:true}, base:'none', gel, gc:gc||null, gcKey:'deck'};
+    await Promise.all((DB.layers||[]).filter(l=>l.kind==='image').map(pmImgLoad));
+    cv.style.cssText=`position:fixed;left:-20000px;top:0;width:${W}px;height:${H}px`; document.body.appendChild(cv);
+    const M=GMap(cv,{base:()=>'none', draw:pmDraw}); M.resize();
+    const P=pmFeatures().map(f=>[f.x,f.y]);
+    if(!gel) (DB.layers||[]).forEach(l=>{ if(l.kind==='image'&&l.b){ P.push(merc(l.b.n,l.b.w), merc(l.b.s,l.b.e)); } (l.feats||[]).forEach(f=>f.c.forEach(c=>P.push(merc(c[1],c[0])))); });
+    if(M.fit(P)){ M.draw(); out={data:cv.toDataURL('image/png'), w:cv.width, h:cv.height}; }
+  }catch(e){ out=null; }
+  cv.remove(); ui.pm=save; return out;
+}
+/* ---- kuyu kesiti ---- */
+function holeTrace(h){
+  const S=holeSurveys(h).filter(s=>s.depth!==''&&s.depth!=null).map(s=>({d:+s.depth, az:+(s.azi??h.azi??0), dip:Math.abs(+(s.dip??h.dip??90))})).sort((a,b)=>a.d-b.d);
+  if(!S.length) S.push({d:0, az:+h.azi||0, dip:Math.abs(+h.dip||90)});
+  const eoh=Math.max(+h.eoh||0, lastTo(h.lith), lastTo(h.samp), +h.plan||0, 1), pts=[{d:0,x:0,y:0,z:0}], r=Math.PI/180; let x=0,y=0,z=0;
+  const at=d=>{ let s=S[0]; for(const q of S) if(q.d<=d) s=q; return s; };
+  for(let d=0; d<eoh-1e-9; ){ const st=Math.min(2, eoh-d), s=at(d+st/2); x+=st*Math.cos(s.dip*r)*Math.sin(s.az*r); y+=st*Math.cos(s.dip*r)*Math.cos(s.az*r); z-=st*Math.sin(s.dip*r); d+=st; pts.push({d,x,y,z}); }
+  return pts;
+}
+function crossSectionSVG(holes, ic){
+  if(!holes.length) return null;
+  let zone=null; const C=holes.map(h=>{ let E=num(h.E), N=num(h.N);
+    if((E==null||N==null) && num(h.lat)!=null){ const u=toUTM(+h.lat,+h.lon,zone||undefined); E=u.E; N=u.N; zone=zone||u.zone; } else if(h.zone) zone=zone||+h.zone;
+    return {h, E, N, el:num(h.elev)??0, tr:holeTrace(h)}; });
+  const xy=C.filter(c=>c.E!=null);
+  let ux=1, uy=0, warn='';
+  if(xy.length>=2){ const mx=xy.reduce((s,c)=>s+c.E,0)/xy.length, my=xy.reduce((s,c)=>s+c.N,0)/xy.length; let sxx=0,syy=0,sxy=0; xy.forEach(c=>{ const a=c.E-mx,b=c.N-my; sxx+=a*a; syy+=b*b; sxy+=a*b; });
+    const th=0.5*Math.atan2(2*sxy, sxx-syy); ux=Math.cos(th); uy=Math.sin(th); }
+  else { const az=(+holes[0].azi||90)*Math.PI/180; ux=Math.sin(az); uy=Math.cos(az); }
+  if(ux<0||(Math.abs(ux)<1e-6&&uy<0)){ ux=-ux; uy=-uy; }
+  const secAz=((Math.atan2(ux,uy)*180/Math.PI)+360)%360;
+  let k=0; C.forEach(c=>{ if(c.E==null){ c.E=(xy[0]?.E||0)+k*50; c.N=(xy[0]?.N||0); k++; warn=LG('Bazı kuyuların koordinatı yok; eşit aralıkla yerleştirildi.','Some holes have no coordinates; spaced evenly.'); } });
+  const E0=Math.min(...C.map(c=>c.E*ux+c.N*uy));
+  let off=0; C.forEach(c=>{ c.P=c.tr.map(p=>({d:p.d, s:(c.E+p.x)*ux+(c.N+p.y)*uy-E0, z:c.el+p.z})); const vx=-uy, vy=ux; off=Math.max(off, Math.abs((c.E-xy[0]?.E||0)*vx+(c.N-xy[0]?.N||0)*vy)); });
+  const all=C.flatMap(c=>c.P); let s0=Math.min(...all.map(p=>p.s)), s1=Math.max(...all.map(p=>p.s)), z0=Math.min(...all.map(p=>p.z)), z1=Math.max(...all.map(p=>p.z));
+  const pad=Math.max(20,(s1-s0)*0.08, (z1-z0)*0.08); s0-=pad*2.5; s1+=pad*2.5; z0-=pad; z1+=pad*0.8;
+  const W=1400, Hh=820, m={l:70,r:30,t:40,b:110}, sc=Math.min((W-m.l-m.r)/(s1-s0),(Hh-m.t-m.b)/(z1-z0));
+  const X=s=>m.l+(s-s0)*sc, Y=z=>m.t+(z1-z)*sc, H=Math.round(m.t+(z1-z0)*sc+m.b);
+  let g=`<rect width="${W}" height="${H}" fill="#fff"/>`;
+  const step=[10,20,25,50,100,200,250,500].find(v=>v*sc>=55)||1000;
+  for(let z=Math.ceil(z0/step)*step; z<=z1; z+=step){ g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${Y(z)}" y2="${Y(z)}" stroke="#eee"/><text x="${m.l-6}" y="${Y(z)+4}" font-size="12" text-anchor="end" fill="#666">${z}</text>`; }
+  g+=`<text transform="translate(16 ${(m.t+H-m.b)/2}) rotate(-90)" font-size="12" text-anchor="middle" fill="#666">${LG('Kot (m)','Elevation (m)')}</text>`;
+  const cs=C.slice().sort((a,b)=>a.P[0].s-b.P[0].s); g+=`<polyline points="${cs.map(c=>`${X(c.P[0].s).toFixed(1)},${Y(c.P[0].z).toFixed(1)}`).join(' ')}" fill="none" stroke="#8a7a5a" stroke-width="2" stroke-dasharray="6 4"/>`;
+  const posAt=(c,d)=>{ const P=c.P; for(let i=1;i<P.length;i++) if(P[i].d>=d-1e-9){ const a=P[i-1], b=P[i], t=(d-a.d)/((b.d-a.d)||1); return {s:a.s+(b.s-a.s)*t, z:a.z+(b.z-a.z)*t}; } return P[P.length-1]; };
+  const seg=(c,a,b)=>{ const pts=[posAt(c,a), ...c.P.filter(p=>p.d>a&&p.d<b), posAt(c,b)]; return pts.map(p=>`${X(p.s).toFixed(1)},${Y(p.z).toFixed(1)}`).join(' '); };
+  const lits=new Set();
+  C.forEach(c=>{ const h=c.h;
+    g+=`<polyline points="${seg(c,0,c.P[c.P.length-1].d)}" fill="none" stroke="#bbb" stroke-width="10" stroke-linecap="butt"/>`;
+    h.lith.forEach(r=>{ const a=+r.from, b=+r.to; if(isNaN(a)||isNaN(b)||b<=a) return; lits.add(r.lit1||''); g+=`<polyline points="${seg(c,a,b)}" fill="none" stroke="${lithColor(r.lit1)}" stroke-width="10"/>`; });
+    const IC=holeIntercepts(h, ic).IC, p0=c.P[0], pe=c.P[c.P.length-1], side=(X(pe.s)-X(p0.s))>1?-1:1;
+    IC.forEach(it=>{ const pts=[posAt(c,it.from), ...c.P.filter(p=>p.d>it.from&&p.d<it.to), posAt(c,it.to)].map(p=>`${(X(p.s)+side*12).toFixed(1)},${Y(p.z).toFixed(1)}`).join(' ');
+      g+=`<polyline points="${pts}" fill="none" stroke="#c0392b" stroke-width="6"/>`; const mid=posAt(c,(it.from+it.to)/2);
+      g+=`<text x="${(X(mid.s)+side*22).toFixed(1)}" y="${(Y(mid.z)+4).toFixed(1)}" font-size="13" font-weight="700" fill="#9e0a26" text-anchor="${side<0?'end':'start'}" stroke="#fff" stroke-width="3" paint-order="stroke">${it.len.toFixed(1)} m @ ${fmtG(it.g,ic.unit)} ${esc(ic.unit)}</text>`; });
+    g+=`<circle cx="${X(p0.s)}" cy="${Y(p0.z)}" r="5" fill="#2f7a4a"/><text x="${X(p0.s)}" y="${Y(p0.z)-12}" font-size="15" font-weight="700" text-anchor="middle" fill="#1f5a33">${esc(h.id)}</text>
+      <text x="${X(pe.s)}" y="${Y(pe.z)+18}" font-size="11" text-anchor="middle" fill="#666">EOH ${fm(pe.d)}</text>`; });
+  const sm=[10,20,25,50,100,200,250,500,1000].find(v=>v*sc>=90)||1000; const yb=H-m.b+38;
+  g+=`<line x1="${W-m.r-sm*sc}" x2="${W-m.r}" y1="${yb}" y2="${yb}" stroke="#222" stroke-width="3"/><text x="${W-m.r-sm*sc/2}" y="${yb-6}" font-size="12" text-anchor="middle">${sm} m</text>`;
+  const dir=d=>LG(['K','KD','D','GD','G','GB','B','KB'],['N','NE','E','SE','S','SW','W','NW'])[Math.round(((d%360)+360)%360/45)%8];
+  g+=`<text x="${m.l}" y="22" font-size="13" fill="#444">${LG('Kesit doğrultusu','Section azimuth')} ${pad3((secAz+180)%360)}° (${dir(secAz+180)}) → ${pad3(secAz)}° (${dir(secAz)}) · ${LG('düşey abartı yok','no vertical exaggeration')}${xy.length>=2?` · ${LG('kesite en uzak kuyu','max. offset from section')} ${Math.round(off)} m`:''}</text>`;
+  let lx=m.l; [...lits].filter(Boolean).slice(0,8).forEach(l=>{ g+=`<rect x="${lx}" y="${yb-10}" width="14" height="14" fill="${lithColor(l)}" stroke="#555" stroke-width=".5"/><text x="${lx+19}" y="${yb+2}" font-size="12">${esc(l)}</text>`; lx+=34+l.length*7; });
+  g+=`<rect x="${lx}" y="${yb-6}" width="22" height="6" fill="#c0392b"/><text x="${lx+28}" y="${yb+2}" font-size="12">${LG('Aralık','Intercept')} (≥${esc(ic.cut)} ${esc(ic.unit)} ${esc(ic.el)})</text>`;
+  if(warn) g+=`<text x="${m.l}" y="${H-12}" font-size="11" fill="#9a5">${esc(warn)}</text>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" font-family="Arial,Helvetica,sans-serif">${g}</svg>`;
+}
+const DECK_SL=()=>[['ozet',LG('Proje özeti','Project summary')],['harita',LG('Proje haritası','Project map')],['yuzey',LG('Yüzey örneklemesi','Surface sampling')],['jk',LG('Jeokimya özeti','Geochemistry summary')],['tem',LG('Tematik haritalar','Thematic maps')],
+  ['sondaj',LG('Sondaj programı','Drilling programme')],['aralik',LG('Önemli aralıklar (liste)','Significant intercepts (list)')],['tablo',LG('Aralık tablosu','Intercept table')],['log',LG('Grafik loglar','Strip logs')],['kesit',LG('Kuyu kesiti','Drill section')],
+  ['yapi',LG('Yapısal veriler','Structural data')],['qaqc','QA/QC'],['gozlem',LG('Saha gözlemleri','Field observations')]];
+async function buildDeck(o){
+  const m=curMeta()||{}, S=[], P=LG, prj=m.name||DB.settings.prj, on=k=>o.slides[k]!==false;
+  await ensureAssayIndex(); const ic=icSettings();
+  const logo=await svgToPng(LOGO_SVG(120),3);
+  S.push({cover:true, title:prj, lines:[[m.district,m.region,m.country].filter(Boolean).join(' · '), m.license?P(`Ruhsat: ${m.license}`,`Licence: ${m.license}`):'', m.client||''].filter(Boolean),
+    foot:P(`Veri özeti · ${fDate(today())}`,`Data summary · ${fDate(today())}`)+(m.geo?` · ${m.geo}`:''), logo});
+  const cnt=t=>DB.samples.filter(s=>s.type===t).length, drillM=DB.holes.reduce((s,h)=>s+(+h.eoh||lastTo(h.lith)||0),0), nDS=DB.holes.reduce((s,h)=>s+h.samp.length,0), nQC=DB.holes.reduce((s,h)=>s+(h.qc||[]).length,0)+cnt('QC');
+  if(on('ozet')){ const k=[]; const kp=(v,l)=>{ if(v) k.push({v:String(v), l}); };
+    kp(DB.samples.length-cnt('QC'),P('Yüzey örneği','Surface samples')); kp(DB.obs.length,P('Saha gözlemi','Field observations')); kp(DB.meas.length,P('Yapısal ölçüm','Structural measurements'));
+    kp(DB.holes.length,P('Sondaj kuyusu','Drill holes')); kp(drillM?Math.round(drillM).toLocaleString('tr-TR')+' m':'',P('Toplam sondaj','Total drilled')); kp(nDS,P('Sondaj numunesi','Drill samples'));
+    kp(nQC,P('QA/QC numunesi','QA/QC samples')); kp(DB.geochem.reduce((s,d)=>s+d.n,0),P('Laboratuvar sonucu','Lab results'));
+    const allRec=[...DB.samples,...DB.obs,...DB.meas];
+    S.push({title:P('Proje özeti','Project summary'), items:[{t:'kpi', list:k.slice(0,8)}, {t:'text', x:0.6, y:6.25, w:12.1, h:0.5, size:13, color:DK.mut, text:[dateRange(allRec)?P(`Saha çalışması: ${dateRange(allRec)}`,`Fieldwork: ${dateRange(allRec)}`):'', m.desc||''].filter(Boolean).join('   ·   ')}]}); }
+  if(on('harita')){ const map1=await deckMap(null); if(map1) S.push({title:P('Proje haritası','Project map'), items:[{t:'img', x:0.6, y:1.25, w:12.1, h:5.6, img:map1}], note:P('Örnekler, gözlemler, yapısal ölçümler, sondaj kuyuları ve harita katmanları','Samples, observations, structural measurements, drill holes and map layers')}); }
+  const types=['SS','SL','RK','QC'].filter(t=>cnt(t));
+  if(on('yuzey') && types.length){
+    const has=new Set(); for(const d of DB.geochem){ (await gcGet(d._u)||[]).forEach(r=>has.add(String(r.id).trim().toLowerCase())); }
+    const rows=types.map(t=>{ const L=DB.samples.filter(s=>s.type===t); return [P(TYPES[t].ad,T(TYPES[t].ad)), L.length, L.filter(s=>s.durum==='Laba gönderildi').length, L.filter(s=>s.durum==='Sonuç geldi'||has.has(String(s.id).trim().toLowerCase())).length, dateRange(L)]; });
+    const bl=[], dist=(L,k)=>{ const c={}; L.forEach(s=>{ if(s[k]) c[s[k]]=(c[s[k]]||0)+1; }); return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([l,n])=>`${l} (${n})`).join(', '); };
+    const rk=DB.samples.filter(s=>s.type==='RK'), sl=DB.samples.filter(s=>s.type==='SL'), ss=DB.samples.filter(s=>s.type==='SS');
+    if(dist(rk,'lito')) bl.push(P('Kayaç örneklerinde litoloji: ','Rock sample lithology: ')+dist(rk,'lito')); if(dist(sl,'horizon')) bl.push(P('Toprak horizonu: ','Soil horizon: ')+dist(sl,'horizon')); if(dist(ss,'fraksiyon')) bl.push(P('Sediman fraksiyonu: ','Sediment fraction: ')+dist(ss,'fraksiyon'));
+    S.push({title:P('Yüzey örneklemesi','Surface sampling'), items:[{t:'table', x:0.6, y:1.35, w:12.1, head:[P('Örnek tipi','Sample type'),P('Adet','Count'),P('Laba gönderildi','Sent to lab'),P('Sonucu var','With results'),P('Tarih aralığı','Date range')], rows, colW:[3.4,1.5,2.1,2.1,3.0]},
+      ...(bl.length?[{t:'bullets', x:0.6, y:1.35+0.42*(rows.length+1)+0.4, w:12.1, h:2.4, lines:bl, size:14}]:[])]});
+  }
+  // jeokimya: ortam başına
+  for(const g of (on('jk')||on('tem'))?await deckGcGroups():[]){
+    const mName=P(g.media,T(g.media)), st=el=>{ const a=g.rows.map(r=>r.v[el]).filter(v=>v!=null).sort((x,y)=>x-y); return {n:a.length, med:pctl(a,50), p95:pctl(a,95), max:a[a.length-1]}; };
+    const sel=((o.els||{})[g.media]||g.def).filter(e=>g.els.includes(e));
+    if(on('jk')){ const order=[...sel, ...g.els.filter(e=>!sel.includes(e))].slice(0,11);
+      S.push({title:P(`Jeokimya özeti · ${mName}`,`Geochemistry summary · ${mName}`), items:[{t:'table', x:0.6, y:1.35, w:7.6, head:['Element',P('Birim','Unit'),'n',P('Medyan','Median'),'P95','Max'], rows:order.map(e=>{ const s=st(e); return [e, g.unit[e], s.n, fmtv(s.med), fmtv(s.p95), fmtv(s.max)]; }), colW:[1.2,1.0,0.9,1.5,1.5,1.5]},
+        ...(g.cor.length?[{t:'text', x:8.6, y:1.35, w:4.1, h:0.4, size:15, bold:true, text:P(`${g.main} ile korelasyon (log Pearson r)`,`Correlation with ${g.main} (log Pearson r)`)},
+          {t:'table', x:8.6, y:1.85, w:4.1, head:['Element','r',P('İlişki','Strength')], rows:g.cor.slice(0,8).map(c=>[c.e, c.r.toFixed(2), c.r>=0.7?P('güçlü','strong'):c.r>=0.5?P('orta','moderate'):c.r>=0.3?P('zayıf','weak'):'—']), colW:[1.3,1.2,1.6]}]:[])],
+        note:P(`${g.rows.length} örnek · ${g.ds.join(', ')}`,`${g.rows.length} samples · ${g.ds.join(', ')}`)}); }
+    if(on('tem') && sel.length){
+      const gc={rows:g.rows, unit:g.unit, els:g.els};
+      if(o.mapLayout==='grid' && sel.length>1){
+        for(let i=0;i<sel.length;i+=4){ const part=sel.slice(i,i+4), items=[];
+          for(let j=0;j<part.length;j++){ const im=await deckMap(part[j], gc, [1400,580]); if(!im) continue; const x=0.6+(j%2)*6.15, y=1.25+Math.floor(j/2)*2.85; items.push({t:'text', x, y, w:5.9, h:0.3, size:12, bold:true, text:`${part[j]} (${g.unit[part[j]]})`}, {t:'img', x, y:y+0.32, w:5.9, h:2.45, img:im}); }
+          if(items.length) S.push({title:P(`Tematik haritalar · ${mName}`,`Thematic maps · ${mName}`), items, note:P('Renk sınıfları persentillere göre: P50, P75, P90, P95, P98','Colour classes by percentile: P50, P75, P90, P95, P98')}); }
+      } else for(const el of sel){ const im=await deckMap(el, gc); if(!im) continue; const med=st(el).med, top=g.rows.filter(r=>r.v[el]!=null).sort((a,b)=>b.v[el]-a.v[el]).slice(0,10);
+        S.push({title:P(`${el} · ${mName}`,`${el} · ${mName}`), items:[{t:'img', x:0.6, y:1.25, w:7.9, h:5.6, img:im},
+          {t:'table', x:8.8, y:1.35, w:3.9, head:[P('Örnek no','Sample'),`${el} (${g.unit[el]})`,'×'+P('medyan','median')], rows:top.map(r=>[r.id, fmtv(r.v[el]), med?(r.v[el]/med).toFixed(1):'—']), colW:[1.7,1.2,1.0], size:10}],
+          note:P('Renk sınıfları persentillere göre: P50, P75, P90, P95, P98','Colour classes by percentile: P50, P75, P90, P95, P98')}); }
+    }
+  }
+  // sondaj
+  if(DB.holes.length){
+    const HI=DB.holes.map(h=>{ const IC=holeIntercepts(h,ic).IC; const best=IC.slice().sort((a,b)=>b.g*b.len-a.g*a.len)[0]; return {h, IC, best}; });
+    if(on('sondaj')) for(let i=0;i<HI.length;i+=12) S.push({title:P('Sondaj programı','Drilling programme')+(HI.length>12?` (${i/12+1})`:''), items:[{t:'table', x:0.6, y:1.35, w:12.1,
+      head:[P('Kuyu','Hole'),P('Azimut / eğim','Azimuth / dip'),'EOH (m)',P('Loglanan (m)','Logged (m)'),P('Numune','Samples'),'QC',P('En iyi aralık','Best intercept')],
+      rows:HI.slice(i,i+12).map(({h,best})=>[h.id, `${h.azi??'—'}° / ${h.dip??'—'}°`, h.eoh||h.plan||'—', fm(lastTo(h.lith))||'—', h.samp.length, (h.qc||[]).length, best?`${best.len.toFixed(2)} m @ ${fmtG(best.g,ic.unit)} ${ic.unit} ${ic.el}`:'—']), colW:[1.4,1.7,1.1,1.4,1.2,0.8,4.5], size:11}],
+      note:P(`Toplam ${Math.round(drillM)} m. Tenör aralıkları: alt tenör ${ic.cut} ${ic.unit}, en fazla ${ic.dil} m iç seyrelme, en kısa ${ic.min} m.`,`Total ${Math.round(drillM)} m. Intercepts: cut-off ${ic.cut} ${ic.unit}, max ${ic.dil} m internal dilution, min ${ic.min} m.`)});
+    const allIC=HI.flatMap(x=>x.IC).sort((a,b)=>b.g*b.len-a.g*a.len), gm=PREC.includes(ic.el)&&ic.unit==='g/t';
+    if(on('aralik') && allIC.length) S.push({title:P('Önemli aralıklar','Significant intercepts'), items:[{t:'bullets', x:0.6, y:1.35, w:12.1, h:5.3, lines:allIC.slice(0,12).map(c=>c.text+(gm?`  (${(c.g*c.len).toFixed(1)} g·m)`:'')), size:allIC.length>8?13:15}],
+      note:P(`Uzunluk ağırlıklı ortalama; “içinde” eşiği ${ic.hi} ${ic.unit}.`,`Length-weighted average; “including” threshold ${ic.hi} ${ic.unit}.`)});
+    if(on('tablo') && allIC.length){ const rows=[];
+      HI.forEach(({h,IC})=>IC.forEach(c=>{ rows.push([h.id, fm(c.from), fm(c.to), c.len.toFixed(2), fmtG(c.g,ic.unit), ...(gm?[(c.g*c.len).toFixed(1)]:[]), c.n]); (c.incl||[]).forEach(x=>rows.push(['   '+P('içinde','incl.'), fm(x.from), fm(x.to), x.len.toFixed(2), fmtG(x.g,ic.unit), ...(gm?[(x.g*x.len).toFixed(1)]:[]), x.n])); }));
+      for(let i=0;i<rows.length;i+=13) S.push({title:P('Aralık tablosu','Intercept table')+(rows.length>13?` (${i/13+1})`:''), items:[{t:'table', x:0.6, y:1.35, w:12.1, head:[P('Kuyu','Hole'),'From (m)','To (m)',P('Uzunluk (m)','Length (m)'),`${ic.el} (${ic.unit})`,...(gm?['g·m']:[]),P('Numune','Samples')], rows:rows.slice(i,i+13), colW:gm?[2.6,1.5,1.5,1.7,1.8,1.5,1.5]:[3.0,1.8,1.8,1.9,2.0,1.6], size:12}],
+        note:P(`Alt tenör ${ic.cut} ${ic.unit}, en fazla ${ic.dil} m iç seyrelme, en kısa ${ic.min} m; “içinde” ≥ ${ic.hi} ${ic.unit}.`,`Cut-off ${ic.cut} ${ic.unit}, max ${ic.dil} m internal dilution, min ${ic.min} m; “incl.” ≥ ${ic.hi} ${ic.unit}.`)}); }
+    if(on('log')){ const sel=HI.filter(x=>(o.logHoles||[]).includes(x.h._u)), imgs=[];
+      for(const x of sel){ const sc=ui.scale; const depth=Math.max(+x.h.eoh||0, lastTo(x.h.lith), lastTo(x.h.samp), 10); ui.scale=Math.max(2,Math.min(16,Math.floor((o.logLayout==='pair'?1000:1100)/depth))); const svg=stripLog(x.h); ui.scale=sc; const img=await svgToPng(svg,1.6); if(img) imgs.push({x,img}); }
+      if(o.logLayout==='pair') for(let i=0;i<imgs.length;i+=2){ const pr=imgs.slice(i,i+2); S.push({title:P('Grafik log','Strip log')+' · '+pr.map(p=>p.x.h.id).join(' · '), items:pr.flatMap((p,j)=>[{t:'text', x:0.6+j*6.15, y:1.25, w:5.9, h:0.5, size:12, bold:true, text:`${p.x.h.id} · Az ${p.x.h.azi??'—'}° / ${p.x.h.dip??'—'}° · EOH ${p.x.h.eoh||'—'} m${p.x.best?' · '+p.x.best.len.toFixed(1)+' m @ '+fmtG(p.x.best.g,ic.unit)+' '+ic.unit:''}`},{t:'img', x:0.6+j*6.15, y:1.75, w:5.9, h:5.1, img:p.img}])}); }
+      else imgs.forEach(({x,img})=>S.push({title:P(`Grafik log · ${x.h.id}`,`Strip log · ${x.h.id}`), items:[{t:'img', x:0.6, y:1.25, w:8.4, h:5.7, img},
+        {t:'bullets', x:9.3, y:1.35, w:3.5, h:5.3, size:13, lines:[`Az ${x.h.azi??'—'}° / ${x.h.dip??'—'}°, EOH ${x.h.eoh||'—'} m`, ...(x.IC.length?x.IC.map(c=>c.text.replace(x.h.id+': ','')):[P('Alt tenörü geçen aralık yok','No intercept above cut-off')])]}]})); }
+    if(on('kesit')){ const hs=DB.holes.filter(h=>(o.secHoles||[]).includes(h._u)); const svg=crossSectionSVG(hs, ic); const img=svg?await svgToPng(svg,1.4):null;
+      if(img) S.push({title:P('Kuyu kesiti','Drill section')+' · '+hs.map(h=>h.id).join(', '), items:[{t:'img', x:0.6, y:1.25, w:12.1, h:5.6, img}],
+        note:P('Kuyular, kuyu başlarından geçen en uygun hatta izdüşürülmüştür. Kırmızı çubuklar alt tenörü geçen aralıklardır.','Holes are projected onto the best-fit line through the collars. Red bars are intercepts above cut-off.')}); }
+  }
+  if(on('yapi') && DB.meas.length){
+    const kinds=[...new Set(DB.meas.map(m=>m.kind))];
+    const rows=kinds.map(kd=>{ const L=DB.meas.filter(m=>m.kind===kd), mp=meanPlane(L); return [P(kd,T(kd)), L.length, mp?`${pad3(mp.dd)} / ${mp.dip}°`:'—', mp?`${pad3((mp.dd+270)%360)}`:'—']; });
+    const st=await svgToPng(stereonet(DB.meas, 520),2);
+    S.push({title:P('Yapısal veriler','Structural data'), items:[...(st?[{t:'img', x:0.6, y:1.25, w:5.5, h:5.5, img:st}]:[]),
+      {t:'table', x:6.7, y:1.35, w:6.0, head:[P('Yapı tipi','Structure'),'n',P('Ort. eğim yönü / eğim','Mean dip dir. / dip'),P('Doğrultu','Strike')], rows, colW:[1.8,0.8,2.2,1.2]}],
+      note:P('Stereonet: Schmidt, alt yarıküre, düzlem kutupları. Ortalama, kutup vektörlerinin ortalamasıdır.','Stereonet: Schmidt, lower hemisphere, poles to planes. Mean = mean pole vector.')});
+  }
+  const qel=assayIdx.els.includes(ic.el)?ic.el:assayIdx.els[0];
+  if(on('qaqc') && qel){
+    const items=qcItems(), unit=assayIdx.units[qel], val=id=>{ const a=assayOf(id); return a?a.v[qel]:null; }, rows=[];
+    const G={}; items.filter(q=>qcKind(q.tip)==='std').forEach(q=>{ const v=val(q.id); if(v!=null) (G[q.ref||'?']=G[q.ref||'?']||[]).push(v); });
+    Object.entries(G).forEach(([n,v])=>{ const c=crmList().find(x=>x.name===n&&x.el===qel); const avg=v.reduce((a,b)=>a+b,0)/v.length;
+      if(c){ const f=(UNIT_PPM[c.unit]||1)/(UNIT_PPM[unit]||1), mu=+c.mean*f, sd=+c.sd*f; rows.push([P('Standart','Standard')+' · '+n, v.length, `bias ${((avg/mu-1)*100).toFixed(1)}%`, `${v.filter(x=>Math.abs(x-mu)>3*sd).length} ${P('adet >3SD','>3SD')}`]); }
+      else rows.push([P('Standart','Standard')+' · '+n, v.length, `${P('ort.','mean')} ${fmtv(avg)} ${unit}`, P('sertifika değeri yok','no certified value')]); });
+    const bl=items.filter(q=>qcKind(q.tip)==='blk').map(q=>val(q.id)).filter(v=>v!=null); const dl=approxDL(qel), lim=+((DB.settings.blankLim||{})[qel])||(dl?dl*5:0);
+    if(bl.length) rows.push(['Blank', bl.length, `${P('eşik','limit')} ${fmtv(lim)} ${unit}`, `${bl.filter(v=>v>lim).length} ${P('adet eşik üstü','above limit')}`]);
+    const dp=items.filter(q=>['fdup','cdup','pdup'].includes(qcKind(q.tip))).map(q=>({a:val(q.ref), b:val(q.id)})).filter(p=>p.a>0&&p.b>0&&(p.a+p.b)/2>=(dl||0)*10);
+    if(dp.length){ const h=dp.map(p=>Math.abs(p.a-p.b)/(p.a+p.b)*100); rows.push([P('Duplikat','Duplicates'), dp.length, `HARD ≤20%: ${Math.round(h.filter(x=>x<=20).length/h.length*100)}%`, `HARD ≤30%: ${Math.round(h.filter(x=>x<=30).length/h.length*100)}%`]); }
+    if(rows.length) S.push({title:P(`QA/QC özeti · ${qel}`,`QA/QC summary · ${qel}`), items:[{t:'table', x:0.6, y:1.35, w:12.1, head:[P('Kontrol','Control'),'n',P('Sonuç','Result'),P('Uyarı','Flag')], rows, colW:[4.3,1.2,3.4,3.2]}],
+      note:P('Bias: standart ortalamasının sertifika değerinden sapması. HARD = |a−b|/(a+b)×100; tespit sınırına yakın çiftler hariç.','Bias: deviation of the standard mean from the certified value. HARD = |a−b|/(a+b)×100; pairs near detection excluded.')});
+  }
+  if(on('gozlem') && DB.obs.length){
+    const L=DB.obs.slice().sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||''))).slice(0,10);
+    S.push({title:P('Saha gözlemleri','Field observations'), items:[{t:'table', x:0.6, y:1.35, w:12.1, head:[P('Gözlem no','Obs. no.'),P('Tarih','Date'),P('Başlık','Title'),P('Litoloji / alterasyon','Lithology / alteration')],
+      rows:L.map(o=>[o.id, fDate(o.date), (o.baslik||o.tip||'').slice(0,60), [o.lito,o.alt,o.min].filter(Boolean).join(', ').slice(0,60)]), colW:[2.0,1.5,5.0,3.6], size:11}],
+      note:DB.obs.length>10?P(`Son 10 gözlem gösteriliyor (toplam ${DB.obs.length}).`,`Latest 10 of ${DB.obs.length} observations.`):''});
+  }
+  return S;
+}
+function deckDefaults(groups, HI){
+  const d=DB.settings.deck=DB.settings.deck||{};
+  d.fmt=d.fmt||'pptx'; d.slides=d.slides||{}; d.logLayout=d.logLayout||'one'; d.mapLayout=d.mapLayout||'one'; d.els=d.els||{};
+  const ids=new Set(DB.holes.map(h=>h._u));
+  const top=HI.filter(x=>x.best).sort((a,b)=>b.best.g*b.best.len-a.best.g*a.best.len).slice(0,3).map(x=>x.h._u);
+  d.logHoles=(d.logHoles||top).filter(u=>ids.has(u)); if(!d.logHoles.length) d.logHoles=top.length?top:DB.holes.slice(0,1).map(h=>h._u);
+  d.secHoles=(d.secHoles||HI.filter(x=>x.best).map(x=>x.h._u)).filter(u=>ids.has(u)); if(!d.secHoles.length) d.secHoles=DB.holes.slice(0,4).map(h=>h._u);
+  groups.forEach(g=>{ d.els[g.media]=(d.els[g.media]||g.def).filter(e=>g.els.includes(e)); if(!d.els[g.media].length) d.els[g.media]=g.def; });
+  return d;
+}
+async function deckModal(){
+  await ensureAssayIndex(); const ic=icSettings(), groups=await deckGcGroups();
+  const HI=DB.holes.map(h=>{ const IC=holeIntercepts(h,ic).IC; const best=IC.slice().sort((a,b)=>b.g*b.len-a.g*a.len)[0]; return {h, IC, best}; });
+  const d=deckDefaults(groups, HI), ck=(name,val,on,label)=>`<label class="chip ${on?'on':''}" style="gap:6px"><input type="checkbox" name="${name}" value="${esc(val)}" ${on?'checked':''} style="width:15px;height:15px;min-height:0">${label}</label>`;
+  const holeChips=(name,sel)=>HI.map(x=>ck(name,x.h._u,sel.includes(x.h._u),`${esc(x.h.id)}${x.best?` <span class="small" style="opacity:.75">${x.best.len.toFixed(1)} m @ ${fmtG(x.best.g,ic.unit)}</span>`:''}`)).join('');
+  const avail={yuzey:DB.samples.length, jk:groups.length, tem:groups.length, sondaj:DB.holes.length, aralik:HI.some(x=>x.IC.length), tablo:HI.some(x=>x.IC.length), log:DB.holes.length, kesit:DB.holes.length, yapi:DB.meas.length, qaqc:assayIdx.els.length, gozlem:DB.obs.length, harita:1, ozet:1};
   const m=modal(`<h2 style="margin-top:0">${LG('Özet sunum oluştur','Create summary presentation')}</h2>
-    <p class="muted small" style="margin-top:-6px">${LG('Projedeki verilerden kısa bir sunum hazırlanır: proje özeti, harita, yüzey örneklemesi, jeokimya, sondaj ve önemli aralıklar, grafik log, yapısal veriler, QA/QC ve saha gözlemleri. Verisi olmayan bölümler atlanır.','A short presentation is built from the project data: summary, map, surface sampling, geochemistry, drilling and intercepts, strip log, structural data, QA/QC and field observations. Sections without data are skipped.')}</p>
-    <div class="row" style="gap:10px;margin:10px 0"><label class="chip on" style="gap:8px"><input type="radio" name="dk_f" value="pptx" checked style="width:15px;height:15px;min-height:0"> PowerPoint (.pptx)</label><label class="chip" style="gap:8px"><input type="radio" name="dk_f" value="pdf" style="width:15px;height:15px;min-height:0"> PDF</label></div>
-    <p class="muted small">${LG('Tenör aralıkları ve QA/QC, sondajdaki “Tenör / aralık” ayarlarını kullanır','Intercepts and QA/QC use the drill “Assays / intercepts” settings')} (${esc(icSettings().el)}, ${LG('alt tenör','cut-off')} ${esc(icSettings().cut)} ${esc(icSettings().unit)}). ${LG('PowerPoint dosyası açıldıktan sonra her şey düzenlenebilir.','Everything is editable once the PowerPoint file is opened.')}</p>
+    <div class="row" style="gap:10px;margin:4px 0 6px">${['pptx','pdf'].map(f=>`<label class="chip ${d.fmt===f?'on':''}" style="gap:8px"><input type="radio" name="dk_f" value="${f}" ${d.fmt===f?'checked':''} style="width:15px;height:15px;min-height:0"> ${f==='pptx'?'PowerPoint (.pptx)':'PDF'}</label>`).join('')}</div>
+    <h3>${LG('Slaytlar','Slides')}</h3>
+    <div class="chips">${DECK_SL().filter(([k])=>avail[k]).map(([k,l])=>ck('dk_s',k,d.slides[k]!==false,l)).join('')}</div>
+    ${groups.length?`<h3>${LG('Tematik harita elementleri','Thematic map elements')}</h3>
+      ${groups.map(g=>`<div style="margin:6px 0 10px"><div class="small" style="margin-bottom:4px"><b>${esc(LG(g.media,T(g.media)))}</b> <span class="muted">· ${g.rows.length} ${LG('örnek','samples')} · ${LG('önerilen','suggested')}: ${esc(g.def.join(', '))}</span></div>
+        <div class="chips" style="margin:0">${g.els.map(e=>ck('dk_e_'+g.media,e,(d.els[g.media]||[]).includes(e),esc(e))).join('')}</div></div>`).join('')}
+      <div class="row small" style="gap:14px">${LG('Yerleşim:','Layout:')} <label class="chip ${d.mapLayout!=='grid'?'on':''}" style="gap:6px"><input type="radio" name="dk_ml" value="one" ${d.mapLayout!=='grid'?'checked':''} style="width:15px;height:15px;min-height:0"> ${LG('Her element ayrı slayt (harita + en yüksek 10)','One slide per element (map + top 10)')}</label><label class="chip ${d.mapLayout==='grid'?'on':''}" style="gap:6px"><input type="radio" name="dk_ml" value="grid" ${d.mapLayout==='grid'?'checked':''} style="width:15px;height:15px;min-height:0"> ${LG('4 element bir slaytta (2×2)','4 elements per slide (2×2)')}</label></div>`:''}
+    ${DB.holes.length?`<h3>${LG('Grafik log kuyuları','Strip log holes')}</h3>
+      <div class="row small" style="gap:8px;margin-bottom:6px"><button type="button" class="btn ghost sm" data-m="lg_ic">${LG('Aralığı olanlar','With intercepts')}</button><button type="button" class="btn ghost sm" data-m="lg_all">${LG('Tümü','All')}</button><button type="button" class="btn ghost sm" data-m="lg_none">${LG('Hiçbiri','None')}</button></div>
+      <div class="chips" id="dk_lg">${holeChips('dk_lh', d.logHoles)}</div>
+      <div class="row small" style="gap:14px;margin-top:6px">${LG('Yerleşim:','Layout:')} <label class="chip ${d.logLayout!=='pair'?'on':''}" style="gap:6px"><input type="radio" name="dk_ll" value="one" ${d.logLayout!=='pair'?'checked':''} style="width:15px;height:15px;min-height:0"> ${LG('Kuyu başına 1 slayt','One slide per hole')}</label><label class="chip ${d.logLayout==='pair'?'on':''}" style="gap:6px"><input type="radio" name="dk_ll" value="pair" ${d.logLayout==='pair'?'checked':''} style="width:15px;height:15px;min-height:0"> ${LG('2 kuyu yan yana','2 holes side by side')}</label></div>
+      <h3>${LG('Kesitteki kuyular','Holes in section')}</h3>
+      <p class="muted small" style="margin:-4px 0 6px">${LG('Aynı hat üzerindeki kuyuları seçin; kesit, kuyu başlarından geçen en uygun hatta çizilir. Tek kuyu seçilirse kesit kuyunun azimutu boyuncadır.','Pick holes on the same line; the section follows the best-fit line through the collars. With one hole, the section follows its azimuth.')}</p>
+      <div class="chips">${holeChips('dk_sh', d.secHoles)}</div>`:''}
+    <p class="muted small" style="margin-top:12px">${LG('Tenör aralıkları ve QA/QC, sondajdaki “Tenör / aralık” ayarlarını kullanır','Intercepts and QA/QC use the drill “Assays / intercepts” settings')} (${esc(ic.el)}, ${LG('alt tenör','cut-off')} ${esc(ic.cut)} ${esc(ic.unit)}). ${LG('Seçimler bu proje için hatırlanır.','Choices are remembered for this project.')}</p>
     <div class="row end" style="margin-top:14px"><button class="btn ghost" data-m="0">${LG('Vazgeç','Cancel')}</button><button class="btn acc" data-m="1">${LG('Oluştur ve indir','Create and download')}</button></div>`);
-  m.onchange=e=>{ if(e.target.name==='dk_f') m.querySelectorAll('label.chip').forEach(l=>l.classList.toggle('on', l.querySelector('input').checked)); };
-  m.onclick=async e=>{ const b=e.target.closest('[data-m]'); if(!b) return; if(b.dataset.m==='0'){ closeModal(); return; }
-    const fmt=(m.querySelector('input[name=dk_f]:checked')||{}).value||'pptx'; b.disabled=true; b.textContent=LG('Hazırlanıyor…','Preparing…');
-    try{ const S=await buildDeck(); let blob, name=`${DB.settings.prj}_ozet_sunum_${stamp()}.${fmt}`;
-      if(fmt==='pptx'){ if(typeof PptxGenJS==='undefined') throw new Error('pptx'); blob=await deckPPTX(S); } else { if(!window.jspdf) throw new Error('pdf'); blob=deckPDF(S); }
+  m.querySelector('.mbox').classList.add('wide');
+  const sync=()=>m.querySelectorAll('label.chip').forEach(l=>{ const i=l.querySelector('input'); if(i) l.classList.toggle('on', i.checked); });
+  m.onchange=()=>sync();
+  m.onclick=async e=>{ const b=e.target.closest('[data-m]'); if(!b) return;
+    if(b.dataset.m==='0'){ closeModal(); return; }
+    if(b.dataset.m.startsWith('lg_')){ const mode=b.dataset.m; m.querySelectorAll('input[name=dk_lh]').forEach(i=>{ const x=HI.find(y=>y.h._u===i.value); i.checked = mode==='lg_all' || (mode==='lg_ic' && !!(x&&x.best)); }); sync(); return; }
+    const get=n=>[...m.querySelectorAll(`input[name="${n}"]:checked`)].map(i=>i.value);
+    const slides={}; DECK_SL().forEach(([k])=>{ slides[k]=false; }); get('dk_s').forEach(k=>slides[k]=true);
+    const els={}; groups.forEach(g=>{ els[g.media]=get('dk_e_'+g.media); });
+    const o={fmt:(m.querySelector('input[name=dk_f]:checked')||{}).value||'pptx', slides, els, mapLayout:(m.querySelector('input[name=dk_ml]:checked')||{}).value||'one', logHoles:get('dk_lh'), logLayout:(m.querySelector('input[name=dk_ll]:checked')||{}).value||'one', secHoles:get('dk_sh')};
+    Object.assign(DB.settings.deck, o); persist();
+    b.disabled=true; b.textContent=LG('Hazırlanıyor…','Preparing…');
+    try{ const S=await buildDeck(o); let blob, name=`${DB.settings.prj}_ozet_sunum_${stamp()}.${o.fmt}`;
+      if(o.fmt==='pptx'){ if(typeof PptxGenJS==='undefined') throw new Error('pptx'); blob=await deckPPTX(S); } else { if(!window.jspdf) throw new Error('pdf'); blob=deckPDF(S); }
       closeModal(); await saveFile(name, blob); toast(LG(`${S.length} slayt hazırlandı`,`${S.length} slides created`));
     }catch(err){ console.error(err); toast(LG('Sunum oluşturulamadı','Could not create the presentation'),'err'); b.disabled=false; b.textContent=LG('Oluştur ve indir','Create and download'); } };
 }
