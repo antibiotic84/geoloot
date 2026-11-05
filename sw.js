@@ -1,5 +1,5 @@
 /* GEOLOOT service worker – çevrimdışı çalışma */
-const CACHE='geoloot-e51ad3f7';
+const CACHE='geoloot-a934c15d';
 const TILES='geoloot-tiles', TILE_HOSTS=['tile.openstreetmap.org','a.tile.opentopomap.org','b.tile.opentopomap.org','c.tile.opentopomap.org'], TILE_MAX=4000;
 const ASSETS=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png','./icons/icon-maskable-512.png','./icons/apple-touch-icon.png','./icons/favicon-32.png'];
 self.addEventListener('install',e=>{ e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))); self.skipWaiting(); });

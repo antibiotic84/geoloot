@@ -722,11 +722,11 @@ function render(){
   }
   renderNav();
   const V = {gozlem:viewObs, ornekler:viewSamples, yeni:viewSampleForm, olcum:viewClino, sondaj:viewDrill, veritabani:viewDB, jeokimya:viewGeochem, harita:viewMap, aktar:viewExport, 'proje-bilgi':viewProjInfo}[ui.view] || viewSamples;
-  $('#main').innerHTML = projTop() + ((ui.gcImp && ui.gcView==='import' && ['sondaj','aktar','jeokimya'].includes(ui.view)) ? viewGcImport() : V());
+  $('#main').innerHTML = projTop() + ((ui.gcImp && ui.gcView==='import' && ['sondaj','aktar','jeokimya','ornekler','olcum','gozlem'].includes(ui.view)) ? viewGcImport() : V());
   afterRender();
 }
 let afterQueue=[];
-function afterRender(){ const q=afterQueue; afterQueue=[]; q.forEach(f=>f()); if(ui.view==='olcum'&&APP&&APP.current){ updateClinoDOM(); startMeasGeo(); applyMeasGeo(); } else stopMeasGeo(); if(ui.view==='veritabani') dbRefresh(); }
+function afterRender(){ const q=afterQueue; afterQueue=[]; q.forEach(f=>f()); if(ui.view==='olcum'&&APP&&APP.current&&!(ui.gcImp&&ui.gcView==='import')){ updateClinoDOM(); startMeasGeo(); applyMeasGeo(); } else stopMeasGeo(); if(ui.view==='veritabani') dbRefresh(); }
 
 /* ---------- form alanı çizici ---------- */
 function fieldHTML(f, v, pre=''){
@@ -944,6 +944,7 @@ function viewHome(){
       </div>
       <div class="row" style="justify-content:center;margin-top:12px;gap:8px">
         <label class="btn ghost sm" style="cursor:pointer">Yedekten proje aç (JSON)<input type="file" accept=".json,application/json" data-on="importProj" hidden></label>
+        <a class="btn ghost sm" href="kilavuz.pdf" target="_blank" rel="noopener" download="GEOLOOT_Kullanim_Kilavuzu.pdf" title="${LG('Türkçe kullanım kılavuzu','User guide (Turkish)')}">${LG('Kullanım kılavuzu (PDF)','User guide (PDF, Turkish)')}</a>
       </div>
       ${installPrompt?`<div class="row" style="justify-content:center;margin-top:12px"><button class="btn ghost sm" data-act="install" style="border-color:#e08a5c;color:#e9b48a">📲 ${LG('Uygulamayı bu cihaza yükle','Install the app on this device')}</button></div>`:''}
     </div>
@@ -1116,7 +1117,7 @@ function viewSamples(){
   list=list.slice().sort((a,b)=>((b.date||'')+(b.time||'')+b.id).localeCompare((a.date||'')+(a.time||'')+a.id));
   const nb=Object.entries(TYPES).map(([k,t])=>`<button style="background:${t.renk}" data-act="new" data-t="${k}">+ ${t.kisa}<small>Sıradaki: ${esc(nextId(k))}</small></button>`).join('');
   return `
-  <div class="topbar"><h1>Örnek listesi</h1></div>
+  <div class="topbar"><h1>Örnek listesi</h1><label class="btn ghost sm" style="cursor:pointer">${LG('CSV içe aktar','Import CSV')}<input type="file" accept=".csv,.txt,text/csv" data-on="drillImp" data-k="ornek" hidden></label></div>
   ${memOnly?'<div class="banner">⚠ Tarayıcı depolaması kullanılamıyor; veriler sayfa kapanınca kaybolur. “Aktar” bölümünden JSON yedeği alın.</div>':''}
   <div class="stats">
     <div class="stat"><b>${all.length}</b><span>Toplam örnek</span></div>
@@ -1352,7 +1353,7 @@ function viewClino(){
   const obsSel = me ? meObs : fromObs ? fromObs.id : ((la&&isObsId(la.id))?la.id:(DB.obs[DB.obs.length-1]||{}).id);
   const obsList = DB.obs.slice().sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||'')));
   return `
-  <div class="topbar"><h1>Doğrultu / eğim ölçümü</h1></div>
+  <div class="topbar"><h1>Doğrultu / eğim ölçümü</h1><label class="btn ghost sm" style="cursor:pointer">${LG('CSV içe aktar','Import CSV')}<input type="file" accept=".csv,.txt,text/csv" data-on="drillImp" data-k="olcum" hidden></label></div>
   <div class="two">
   <div>
     <div class="card">
@@ -1514,7 +1515,7 @@ function viewObs(){
   const list=DB.obs.slice().sort((a,b)=>((b.date||'')+(b.time||'')).localeCompare((a.date||'')+(a.time||'')));
   afterQueue.push(()=>loadThumbs($('#main')));
   return `
-  <div class="topbar"><h1>Saha gözlemleri</h1><button class="btn acc" data-act="newObs">+ Yeni gözlem</button></div>
+  <div class="topbar"><h1>Saha gözlemleri</h1><div class="row"><label class="btn ghost sm" style="cursor:pointer">${LG('CSV içe aktar','Import CSV')}<input type="file" accept=".csv,.txt,text/csv" data-on="drillImp" data-k="gozlem" hidden></label><button class="btn acc" data-act="newObs">+ Yeni gözlem</button></div></div>
   ${list.length?`<div class="obscards">${list.map(o=>`<div class="obs" data-act="openObs" data-u="${o._u}">
     <div class="th">${(o.photos||[]).length?`<img data-ph="${o.photos[0].id}" alt="">`:camIcon()}</div>
     <div style="min-width:0"><b>${esc(o.id)}</b> <span class="muted small">${esc(o.tip||'')}</span>
@@ -2250,9 +2251,9 @@ function gcStartImport(file, force){
     rows.slice(0,25).forEach((r,i)=>{ const sc=r.filter(c=>parseElHeader(c)).length*2 + (r.some(c=>/sample|örnek|numune/i.test(c))?3:0); if(sc>best){ best=sc; header=i; } });
     const imp={file:file.name, name:file.name.replace(/\.(csv|txt)$/i,''), rows, delim, header, media:'Dere sedimanı', dl:'half', decComma:delim===';', zone:(()=>{ const c={}; DB.samples.forEach(x=>{ if(x.zone) c[x.zone]=(c[x.zone]||0)+1; }); const z=Object.keys(c).sort((a,b)=>c[b]-c[a])[0]; return z?+z:DB.settings.zone; })(), hem:([...DB.samples,...DB.obs,...DB.holes].find(x=>x.hem)||{}).hem||(/zimbab|zambi|tanzan|güney afrika|south africa|botsw|namib|mozamb|madagas|malawi|angola|peru|brezilya|brazil|şili|chile|bolivya|bolivia|arjantin|argentin|avustralya|australia|endonezya|indonesia|papua|demokratik kongo|dr congo/i.test((curMeta()||{}).country||'')?'S':'N'), arc:false};
     imp.keepExtra=true; imp.dup='skip'; imp.fixType='RK'; imp.autoKind=impDetectKind(rows[header]||[]);
-    if(force==='assay'){ imp.autoKind='gc'; } else if(force) imp.autoKind=force;
+    if(force==='assay'||force==='gc'){ imp.autoKind='gc'; } else if(force) imp.autoKind=force;
     impSetKind(imp, imp.autoKind); if(force==='assay') gcDrillMode(imp, true);
-    ui.gcImp=imp; ui.gcView='import'; if(!['sondaj','aktar','jeokimya'].includes(ui.view)){ ui.view='jeokimya'; } render(); window.scrollTo(0,0);
+    ui.gcImp=imp; ui.gcView='import'; if(!['sondaj','aktar','jeokimya','ornekler','olcum','gozlem'].includes(ui.view)){ ui.view='jeokimya'; } render(); window.scrollTo(0,0);
   };
   fr.readAsText(file);
 }
@@ -2443,7 +2444,7 @@ function viewGeochem(){
   const DS=DB.geochem;
   ui.gx.ds=ui.gx.ds.filter(u=>DS.some(d=>d._u===u)); if(!ui.gx.ds.length && DS.length) ui.gx.ds=[DS[DS.length-1]._u];
   const head=`<div class="topbar"><h1>Jeokimya</h1>
-    <label class="btn acc" style="cursor:pointer">+ CSV içe aktar<input type="file" accept=".csv,.txt,text/csv" data-on="gcFile" hidden></label></div>`;
+    <label class="btn acc" style="cursor:pointer">+ CSV içe aktar<input type="file" accept=".csv,.txt,text/csv" data-on="drillImp" data-k="gc" hidden></label></div>`;
   if(!DS.length) return head+`<div class="card empty">${LG('Henüz jeokimya verisi yok. Laboratuvar sonuçlarını (kayaç, dere sedimanı, toprak…) CSV olarak içe aktarın. Element sütunları ve birimleri otomatik tanınır.','No geochemistry data yet. Import laboratory results (rock, stream sediment, soil…) as CSV. Element columns and units are recognised automatically.')}</div>`;
   const key=ui.gx.ds.join(',');
   if(ui.gx.key!==key || !ui.gx.rows){ gcEnsure().then(()=>{ if(ui.view==='jeokimya') render(); }); return head+'<div class="card empty">'+LG('Veriler yükleniyor…','Loading data…')+'</div>'; }
@@ -3778,7 +3779,7 @@ function viewExport(){
   return `
   <div class="topbar"><h1>Dışa aktarım ve ayarlar</h1></div>
   <div class="card"><div class="row" style="justify-content:space-between"><div><h2 style="margin:0">${esc((curMeta()||{}).name||'')}</h2><div class="muted small">${esc([(curMeta()||{}).code,(curMeta()||{}).district,(curMeta()||{}).region,(curMeta()||{}).country].filter(Boolean).join(' · '))}${(curMeta()||{}).license?' · Ruhsat: '+esc(curMeta().license):''}</div></div>
-    <div class="row"><button class="btn ghost" data-act="projInfo">Proje bilgilerini düzenle</button><button class="btn ghost" data-act="exitProj">⟵ Projeden çık</button></div></div></div>
+    <div class="row"><button class="btn ghost" data-act="projInfo">Proje bilgilerini düzenle</button><a class="btn ghost" href="kilavuz.pdf" target="_blank" rel="noopener" download="GEOLOOT_Kullanim_Kilavuzu.pdf" title="${LG('Türkçe kullanım kılavuzu','User guide (Turkish)')}">${LG('Kullanım kılavuzu (PDF)','User guide (PDF, Turkish)')}</a><button class="btn ghost" data-act="exitProj">⟵ Projeden çık</button></div></div></div>
   <div class="banner">${LG('Bu taslakta veriler <b>bu cihazın tarayıcısında</b> saklanır. Telefon ↔ PC aktarımı için: telefonda <b>JSON yedek indir</b> → PC’de ana ekrandan <b>Yedekten proje aç</b>. Düzenli yedek alın.','In this draft, data is stored <b>in this device’s browser</b>. To move data between phone and PC: on the phone <b>Download JSON backup</b> → on the PC use <b>Open project from backup</b> on the home screen. Back up regularly.')}</div>
   <div class="two">
   <div>
@@ -3814,7 +3815,7 @@ function viewExport(){
       <button class="btn acc" data-act="deck">${LG('Sunum oluştur (PowerPoint / PDF)','Create presentation (PowerPoint / PDF)')}</button>
     </div>
     <div class="card"><h2>${LG('CSV içe aktar (eski proje verisi)','Import CSV (data from earlier projects)')}</h2>
-      <p class="muted small" style="margin:-4px 0 10px">${LG('Yüzey örnekleri, saha gözlemleri, yapısal ölçümler, sondaj (collar, survey, litoloji, numune) ve laboratuvar sonuçları. Dosyayı seçin; uygulama türünü ve sütunları tahmin eder, siz kontrol edip onaylarsınız.','Surface samples, field observations, structural measurements, drilling (collar, survey, lithology, samples) and lab results. Pick the file; the app guesses its type and columns, you check and confirm.')}</p>
+      <p class="muted small" style="margin:-4px 0 10px">${LG('Yüzey örnekleri, saha gözlemleri, yapısal ölçümler, sondaj (collar, survey, litoloji, numune) ve laboratuvar sonuçları. Dosyayı seçin; uygulama türünü ve sütunları tahmin eder, siz kontrol edip onaylarsınız. Her türün içe aktarma düğmesi kendi sayfasında da vardır (Örnekler, Saha gözlemi, Ölçüm, Sondaj, Jeokimya).','Surface samples, field observations, structural measurements, drilling (collar, survey, lithology, samples) and lab results. Pick the file; the app guesses its type and columns, you check and confirm. Each type also has an import button on its own page (Samples, Field observation, Measure, Drilling, Geochemistry).')}</p>
       <label class="btn acc" style="cursor:pointer">${LG('CSV dosyası seç','Choose CSV file')}<input type="file" accept=".csv,.txt,text/csv" data-on="gcFile" hidden></label>
     </div>
     <div class="card"><h2>Yedek</h2>
