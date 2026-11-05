@@ -722,7 +722,7 @@ function render(){
   }
   renderNav();
   const V = {gozlem:viewObs, ornekler:viewSamples, yeni:viewSampleForm, olcum:viewClino, sondaj:viewDrill, veritabani:viewDB, jeokimya:viewGeochem, harita:viewMap, aktar:viewExport, 'proje-bilgi':viewProjInfo}[ui.view] || viewSamples;
-  $('#main').innerHTML = projTop() + V();
+  $('#main').innerHTML = projTop() + ((ui.gcImp && ui.gcView==='import' && ['sondaj','aktar','jeokimya'].includes(ui.view)) ? viewGcImport() : V());
   afterRender();
 }
 let afterQueue=[];
@@ -1606,7 +1606,11 @@ function viewDrill(){
     <div class="small muted">${esc(h.durum||'')} · Az ${esc(h.azi??'')}° / ${esc(h.dip??'')}° · EOH ${esc(h.eoh||'—')} m</div>
     <div class="small">${h.lith.length} log aralığı · ${h.samp.length} numune · ${(h.qc||[]).length} QC · loglanan ${f1(logged)} m</div>
     <div class="bar"><i style="width:${Math.min(100,logged/tot*100)}%"></i></div></div>`;}).join('')}</div>`
-  :'<div class="card empty">Henüz kuyu yok. “+ Yeni kuyu” ile başlayın.</div>'}`;
+  :'<div class="card empty">Henüz kuyu yok. “+ Yeni kuyu” ile başlayın.</div>'}
+  <div class="card" style="margin-top:14px"><h2 style="margin-top:0">${LG('Sondaj verisi içe aktar (CSV)','Import drilling data (CSV)')}</h2>
+    <p class="muted small" style="margin:-4px 0 10px">${LG('Leapfrog / Micromine / Datamine tablo biçimindeki dosyalar. Önerilen sıra: Collar → Survey → Litoloji → Numune → Assay. Numune dosyası yoksa Assay dosyasındaki From–To aralıkları numune olarak eklenebilir.','Leapfrog / Micromine / Datamine table files. Suggested order: Collar → Survey → Lithology → Samples → Assay. Without a samples file, the From–To intervals in the assay file can be added as samples.')}</p>
+    <div class="row">${[['collar','Collar'],['survey','Survey'],['lith',LG('Litoloji','Lithology')],['dsamp',LG('Numune','Samples')],['assay','Assay']].map(([k,l])=>`<label class="btn ${k==='assay'?'acc':''}" style="cursor:pointer">${l}<input type="file" accept=".csv,.txt,text/csv" data-on="drillImp" data-k="${k}" hidden></label>`).join('')}</div>
+  </div>`;
 }
 function viewCollar(h, isNew){
   return `
@@ -2236,7 +2240,7 @@ function gcGuess(imp){
   imp.els=H.map((h,i)=>{ if(i===id||i===imp.xCol||i===imp.yCol) return null; const p=parseElHeader(h); if(!p) return null; if(imp.unitRow){ const um=String(nx[i]||'').trim(); if(um) p.unit=normUnit(um); }
     const num=data.filter(r=>isNumCell(r[i])).length; return num>=Math.min(3,data.length)*0.6 ? {col:i, el:p.el, unit:p.unit||'ppm', on:true} : null; }).filter(Boolean);
 }
-function gcStartImport(file){
+function gcStartImport(file, force){
   const fr=new FileReader();
   fr.onload=()=>{
     let text=String(fr.result||''); if(text.charCodeAt(0)===0xFEFF) text=text.slice(1);
@@ -2245,8 +2249,10 @@ function gcStartImport(file){
     let header=0, best=-1;
     rows.slice(0,25).forEach((r,i)=>{ const sc=r.filter(c=>parseElHeader(c)).length*2 + (r.some(c=>/sample|örnek|numune/i.test(c))?3:0); if(sc>best){ best=sc; header=i; } });
     const imp={file:file.name, name:file.name.replace(/\.(csv|txt)$/i,''), rows, delim, header, media:'Dere sedimanı', dl:'half', decComma:delim===';', zone:(()=>{ const c={}; DB.samples.forEach(x=>{ if(x.zone) c[x.zone]=(c[x.zone]||0)+1; }); const z=Object.keys(c).sort((a,b)=>c[b]-c[a])[0]; return z?+z:DB.settings.zone; })(), hem:([...DB.samples,...DB.obs,...DB.holes].find(x=>x.hem)||{}).hem||(/zimbab|zambi|tanzan|güney afrika|south africa|botsw|namib|mozamb|madagas|malawi|angola|peru|brezilya|brazil|şili|chile|bolivya|bolivia|arjantin|argentin|avustralya|australia|endonezya|indonesia|papua|demokratik kongo|dr congo/i.test((curMeta()||{}).country||'')?'S':'N'), arc:false};
-    imp.keepExtra=true; imp.dup='skip'; imp.fixType='RK'; imp.autoKind=impDetectKind(rows[header]||[]); impSetKind(imp, imp.autoKind);
-    ui.gcImp=imp; ui.gcView='import'; if(ui.view!=='jeokimya'){ ui.view='jeokimya'; } render(); window.scrollTo(0,0);
+    imp.keepExtra=true; imp.dup='skip'; imp.fixType='RK'; imp.autoKind=impDetectKind(rows[header]||[]);
+    if(force==='assay'){ imp.autoKind='gc'; } else if(force) imp.autoKind=force;
+    impSetKind(imp, imp.autoKind); if(force==='assay') gcDrillMode(imp, true);
+    ui.gcImp=imp; ui.gcView='import'; if(!['sondaj','aktar','jeokimya'].includes(ui.view)){ ui.view='jeokimya'; } render(); window.scrollTo(0,0);
   };
   fr.readAsText(file);
 }
@@ -2274,17 +2280,22 @@ function gcBuildRows(imp){
   return out;
 }
 async function gcDoImport(){
-  const imp=ui.gcImp; if(!imp) return;
+  const imp=ui.gcImp; if(!imp) return; gcDefaults();
   if(!imp.els.some(e=>e.on)){ toast(LG('En az bir element sütunu seçin','Select at least one element column'),'err'); return; }
   const rows=gcBuildRows(imp);
   if(!rows.length){ toast(LG('Aktarılacak satır bulunamadı','No rows to import'),'err'); return; }
   const u=uid(), els=imp.els.filter(e=>e.on).map(e=>({el:e.el, unit:e.unit}));
   await gcPut(u, rows);
   DB.geochem.push({_u:u, name:imp.name||imp.file, media:imp.media, date:today(), file:imp.file, n:rows.length, nxy:rows.filter(r=>r.lat!=null).length, els});
-  persist();
+  let addMsg='';
+  if(imp.coord==='drill' && imp.addSamp){ const P=gcDrillPlan(imp); P.add.forEach(a=>{ let h=findHole(a.hole); if(!h){ h=newHoleRec(a.hole); DB.holes.push(h); } h.samp.push({_u:uid(), from:a.from, to:a.to, id:a.id, tip:'Yarım karot', agirlik:'', not:''}); });
+    DB.holes.forEach(h=>{ h.samp.sort((x,y)=>x.from-y.from); if(!h.firstId&&h.samp.length) h.firstId=h.samp.slice().sort(bySeq)[0].id; });
+    if(P.add.length) addMsg=LG(` · ${P.add.length} numune sondaja eklendi`,` · ${P.add.length} samples added to drilling`); }
+  persist(); assayIdx.key=null;
   ui.gcImp=null; ui.gcView='main'; ui.gx.ds=[u]; ui.gx.key=null;
   if(!ui.gx.el || !els.some(e=>e.el===ui.gx.el)) ui.gx.el=(els.find(e=>e.el==='Au')||els[0]).el;
-  toast(LG(`${rows.length} örnek, ${els.length} element içe aktarıldı`,`${rows.length} samples, ${els.length} elements imported`));
+  toast(LG(`${rows.length} örnek, ${els.length} element içe aktarıldı`,`${rows.length} samples, ${els.length} elements imported`)+addMsg);
+  if(imp.coord==='drill' && ui.view!=='jeokimya'){ ui.hole=null; holeEdit=null; go('sondaj'); return; }
   render();
 }
 function viewGcImport(){
@@ -2304,15 +2315,17 @@ function viewGcImport(){
       <label class="fld"><span>Tespit sınırı altı (&lt;)</span><select data-gci="dl"><option value="half" ${imp.dl==='half'?'selected':''}>Sınırın yarısı (önerilen)</option><option value="dl" ${imp.dl==='dl'?'selected':''}>Sınır değeri</option><option value="null" ${imp.dl==='null'?'selected':''}>Boş bırak</option></select></label>
       <label class="fld"><span>Ondalık ayırıcı</span><select data-gci="decComma"><option value="0" ${!imp.decComma?'selected':''}>Nokta (0.5)</option><option value="1" ${imp.decComma?'selected':''}>Virgül (0,5)</option></select></label>
     </div>
-    <h3>Koordinat</h3>
-    <div class="grid">
+    ${imp.coord==='drill'?gcDrillBlock(imp,opt):''}
+    <h3 ${imp.coord==='drill'?'hidden':''}>Koordinat</h3>
+    <div class="grid" ${imp.coord==='drill'?'hidden':''}>
       <label class="fld"><span>Koordinat kaynağı</span><select data-gci="coord">
         <option value="utm" ${imp.coord==='utm'?'selected':''}>CSV’de UTM (WGS84) sütunları</option>
         ${DB.settings.showArc?`<option value="arc" ${imp.coord==='arc'?'selected':''}>CSV’de UTM (Arc 1950) sütunları</option>`:''}
         <option value="ed" ${imp.coord==='ed'?'selected':''}>${LG('CSV’de UTM (ED50) sütunları','UTM (ED50) columns in the CSV')}</option>
         <option value="ll" ${imp.coord==='ll'?'selected':''}>CSV’de enlem / boylam sütunları</option>
-        <option value="match" ${imp.coord==='match'?'selected':''}>GEOLOOT örnek numaralarıyla eşleştir</option></select></label>
-      ${imp.coord!=='match'?`<label class="fld"><span>${imp.coord==='ll'?'Boylam sütunu':'Doğu (E) sütunu'}</span><select data-gci="xCol">${opt(imp.xCol,true)}</select></label>
+        <option value="match" ${imp.coord==='match'?'selected':''}>GEOLOOT örnek numaralarıyla eşleştir</option>
+        <option value="drill" ${imp.coord==='drill'?'selected':''}>${LG('Sondaj numunesi – koordinat gerekmez','Drill samples – no coordinates needed')}</option></select></label>
+      ${imp.coord!=='match'&&imp.coord!=='drill'?`<label class="fld"><span>${imp.coord==='ll'?'Boylam sütunu':'Doğu (E) sütunu'}</span><select data-gci="xCol">${opt(imp.xCol,true)}</select></label>
       <label class="fld"><span>${imp.coord==='ll'?'Enlem sütunu':'Kuzey (N) sütunu'}</span><select data-gci="yCol">${opt(imp.yCol,true)}</select></label>`:''}
       ${imp.coord==='utm'||imp.coord==='arc'||imp.coord==='ed'?`<label class="fld"><span>UTM zon</span><input type="number" data-gci="zone" value="${esc(imp.zone)}"></label>
       <label class="fld"><span>Yarıküre</span><select data-gci="hem"><option value="N" ${imp.hem!=='S'?'selected':''}>K – kuzey</option><option value="S" ${imp.hem==='S'?'selected':''}>G – güney</option></select></label>`:''}
@@ -3226,7 +3239,7 @@ function impCoordGuess(imp){
 }
 function impSetKind(imp, kind){
   imp.kind=kind;
-  if(kind==='gc'){ gcGuess(imp); return; }
+  if(kind==='gc'){ gcGuess(imp); gcDrillMode(imp, false); return; }
   impGuessMap(imp); if(IMP_KINDS()[kind].coord) impCoordGuess(imp);
   if(kind==='ornek'){ gcGuess(imp); impCoordGuess(imp); imp.idCol=imp.map.id; imp.alsoGc=imp.els.length>0; }
 }
@@ -3405,6 +3418,35 @@ function viewRecImport(){
       <tbody>${data.slice(0,8).map(r=>`<tr>${H.map((_,i)=>`<td>${esc(r[i]??'')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
     <div class="row" style="margin-top:14px"><button type="button" class="btn acc big" data-act="impDo" ${st.add||st.upd?'':'disabled'}>${LG('İçe aktar','Import')}</button><button type="button" class="btn ghost" data-act="gcCancel">${LG('Vazgeç','Cancel')}</button></div>
   </form>`;
+}
+function gcDrillMode(imp, force){
+  const H=(imp.rows[imp.header]||[]).map(nh), f=rx=>H.findIndex(h=>rx.test(h));
+  imp.dh={hole:f(/^(holeid|hole|bhid|dhid|kuyu|kuyuadı|kuyuno)$/), from:f(/^(from|depthfrom|mfrom|başlangıç|baş)$/), to:f(/^(to|depthto|mto|bitiş|bit)$/)};
+  if(force || (imp.dh.hole>=0 && imp.dh.from>=0 && imp.dh.to>=0 && imp.coord==='match')){ imp.coord='drill'; imp.media='Sondaj'; imp.xCol=-1; imp.yCol=-1; imp.addSamp=true; }
+}
+function gcDrillBlock(imp, opt){
+  const d=imp.dh||{hole:-1,from:-1,to:-1}, P=gcDrillPlan(imp);
+  return `<h3>${LG('Sondaj numuneleri','Drill samples')}</h3>
+  <p class="small" style="margin:-4px 0 8px">${LG('Sondaj numunelerinin koordinatı olmaz: numune, kuyu başı (collar) koordinatı ve derinliğiyle kuyuya bağlanır. Sonuçlar numune numarasıyla kuyudaki numunelerle eşleşir; Tenör / aralık ve Grafik log bu eşleşmeyi kullanır.','Drill samples have no coordinates of their own: they are tied to the hole by the collar and depth. Results match the hole samples by sample number; Assays / intercepts and the Strip log use this match.')}</p>
+  <div class="grid">
+    <label class="fld"><span>${LG('Kuyu sütunu','Hole column')}</span><select data-gci="dhHole">${opt(d.hole,true)}</select></label>
+    <label class="fld"><span>${LG('From sütunu','From column')}</span><select data-gci="dhFrom">${opt(d.from,true)}</select></label>
+    <label class="fld"><span>${LG('To sütunu','To column')}</span><select data-gci="dhTo">${opt(d.to,true)}</select></label>
+  </div>
+  <div class="row" style="margin-top:8px"><span class="pill ok">${LG('Sondajda kayıtlı numuneyle eşleşen','Matching drill samples')}: ${P.match} / ${P.n}</span>
+    ${P.add.length?`<span class="pill warn">${LG('Sondajda kayıtlı olmayan','Not yet in drilling')}: ${P.add.length}</span>`:''}${P.noIv?`<span class="pill">${LG('Aralığı olmayan (QC vb.)','Without interval (QC etc.)')}: ${P.noIv}</span>`:''}</div>
+  ${!P.match&&!P.add.length?`<div class="warns">⚠ ${LG('Bu dosyadaki numune numaraları sondajda kayıtlı değil ve dosyada kuyu / From / To sütunları yok. Önce sondaj numune dosyasını (Sondaj → Numune) içe aktarın ya da kuyu / From / To sütunlarını seçin.','The sample numbers in this file are not in the drilling data and the file has no hole / From / To columns. Import the drill samples file first (Drilling → Samples) or select the hole / From / To columns.')}</div>`:''}
+  ${P.add.length?`<label class="row small" style="gap:8px;margin-top:8px"><input type="checkbox" data-imo="addSamp" ${imp.addSamp?'checked':''}> ${LG(`Sondajda kayıtlı olmayan ${P.add.length} numuneyi From–To aralıklarıyla kuyulara numune olarak ekle`,`Add the ${P.add.length} samples not yet in drilling to the holes as sample intervals`)}${P.newHoles.size?LG(` (${P.newHoles.size} yeni kuyu oluşturulur: ${esc([...P.newHoles].slice(0,6).join(', '))}${P.newHoles.size>6?'…':''})`,` (${P.newHoles.size} new hole(s) will be created: ${esc([...P.newHoles].slice(0,6).join(', '))}${P.newHoles.size>6?'…':''})`):''}</label>`:''}`;
+}
+function gcDrillPlan(imp){
+  const R=imp.rows.slice(imp.header+1+(imp.unitRow?1:0)), d=imp.dh||{}, out={match:0, add:[], newHoles:new Set(), noIv:0, n:0};
+  const known=new Set(); DB.holes.forEach(h=>[...h.samp,...(h.qc||[])].forEach(x=>known.add(String(x.id).trim().toLowerCase())));
+  R.forEach(r=>{ const id=String(r[imp.idCol]??'').trim(); if(!id) return; out.n++;
+    if(known.has(id.toLowerCase())){ out.match++; return; }
+    const hole=d.hole>=0?String(r[d.hole]??'').trim():'', fr=d.from>=0?impNum(imp,r[d.from]):null, to=d.to>=0?impNum(imp,r[d.to]):null;
+    if(!hole||fr==null||to==null||to<=fr){ out.noIv++; return; }
+    out.add.push({hole, from:fr, to, id}); if(!findHole(hole)) out.newHoles.add(hole); known.add(id.toLowerCase()); });
+  return out;
 }
 function impKindSel(imp){
   const K=IMP_KINDS();
@@ -4027,6 +4069,7 @@ document.addEventListener('change', e=>{
   if(t.dataset.on==='scale'){ ui.scale=+t.value; render(); }
   if(t.dataset.on==='dbs'){ ui.dbs=t.value; dbRefresh(); }
   if(t.dataset.on==='gcFile' && t.files[0]){ gcStartImport(t.files[0]); t.value=''; return; }
+  if(t.dataset.on==='drillImp' && t.files[0]){ gcStartImport(t.files[0], t.dataset.k); t.value=''; return; }
   if(t.dataset.on==='gcEl'){ ui.gx.el=t.value; ui.gx.pair=null; gcMap.idwKey=''; render(); return; }
   if(t.dataset.on==='gcMethod'){ ui.gx.method=t.value; ui.gx.corr=null; render(); return; }
   if(t.dataset.on==='gcPairSel'){ ui.gx.pair=t.value; render(); return; }
@@ -4050,11 +4093,14 @@ document.addEventListener('change', e=>{
     if(['header','xCol','yCol'].includes(k)) imp[k]=+t.value; else if(k==='decComma') imp[k]=t.value==='1'; else imp[k]=t.value;
     if(k==='header') impSetKind(imp, imp.kind); if(k==='coord' && t.value!=='none' && (imp.xCol<0||imp.yCol<0)){ const c=imp.coord; impCoordGuess(imp); imp.coord=c; }
     render(); return; }
+  if(['dhHole','dhFrom','dhTo'].includes(t.dataset.gci) && ui.gcImp){ const imp=ui.gcImp; imp.dh=imp.dh||{}; imp.dh[{dhHole:'hole',dhFrom:'from',dhTo:'to'}[t.dataset.gci]]=+t.value; render(); return; }
+  if(t.dataset.gci==='media' && ui.gcImp && (!ui.gcImp.kind||ui.gcImp.kind==='gc')){ const imp=ui.gcImp; imp.media=t.value; if(t.value==='Sondaj'){ gcDrillMode(imp,true); } else if(imp.coord==='drill'){ imp.coord='match'; } render(); return; }
   if(t.dataset.gci && ui.gcImp){ const k=t.dataset.gci, imp=ui.gcImp;
     if(['header','idCol','xCol','yCol'].includes(k)) imp[k]=+t.value; else if(k==='decComma') imp[k]=t.value==='1'; else imp[k]=t.value;
-    if(k==='header') gcGuess(imp);
-    if(k==='coord' && t.value!=='match' && (imp.xCol<0||imp.yCol<0)){ const c=imp.coord; gcGuess(imp); imp.coord=c; }
-    if(['header','coord','idCol','xCol','yCol'].includes(k)) render(); return; }
+    if(k==='header'){ gcGuess(imp); gcDrillMode(imp,false); }
+    if(k==='coord' && t.value==='drill'){ gcDrillMode(imp,true); }
+    if(k==='coord' && !['match','drill'].includes(t.value) && (imp.xCol<0||imp.yCol<0)){ const c=imp.coord; gcGuess(imp); imp.coord=c; }
+    if(['header','coord','idCol','xCol','yCol'].includes(k) || imp.coord==='drill') render(); return; }
   if(t.dataset.on==='obsMode'){ const pk=$('#obsPick'); if(pk) pk.hidden = t.value!=='existing'; }
   if(t.dataset.on==='dbsel'){ t.checked?ui.dbSel.add(t.dataset.k):ui.dbSel.delete(t.dataset.k); t.closest('tr').classList.toggle('on',t.checked); dbRefresh(false); const all=$('input[data-on=dball]'); if(all){ const L=dbFiltered(); all.checked=L.length&&L.every(x=>ui.dbSel.has(x.key)); } return; }
   if(t.dataset.on==='dball'){ dbFiltered().forEach(x=>t.checked?ui.dbSel.add(x.key):ui.dbSel.delete(x.key)); dbRefresh(); return; }
